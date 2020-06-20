@@ -24,6 +24,9 @@ cc         = "1.0"
 pkg-config = "0.3"
 bindgen    = "0.54"
 
+[target.'cfg(target_env = "msvc")'.build-dependencies]
+vcpkg = "0.2"
+
 [features]
 default  = ["avcodec", "avdevice", "avfilter", "avformat", "swresample", "swscale"]
 
