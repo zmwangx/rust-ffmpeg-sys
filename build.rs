@@ -612,8 +612,7 @@ fn main() {
         );
         link_to_libraries(statik);
         vec![ffmpeg_dir.join("include")]
-    }
-    else if let Some(paths) = try_vcpkg() {
+    } else if let Some(paths) = try_vcpkg() {
         let is_vcpkg_static = env::var_os("VCPKGRS_DYNAMIC").is_none();
         if is_vcpkg_static != statik {
             panic!(
