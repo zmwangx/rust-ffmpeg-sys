@@ -345,12 +345,16 @@ fn build() -> io::Result<()> {
 }
 
 #[cfg(not(target_env = "msvc"))]
-fn try_vcpkg() -> Option<Vec<PathBuf>> {
+fn try_vcpkg(_statik: bool) -> Option<Vec<PathBuf>> {
     None
 }
 
 #[cfg(target_env = "msvc")]
-fn try_vcpkg() -> Option<Vec<PathBuf>> {
+fn try_vcpkg(statik: bool) -> Option<Vec<PathBuf>> {
+    if !statik {
+        env::set_var("VCPKGRS_DYNAMIC", "1");
+    }
+
     vcpkg::find_package("ffmpeg")
         .map_err(|e| {
             println!("Could not find ffmpeg with vcpkg: {}", e);
@@ -612,16 +616,7 @@ fn main() {
         );
         link_to_libraries(statik);
         vec![ffmpeg_dir.join("include")]
-    } else if let Some(paths) = try_vcpkg() {
-        let is_vcpkg_static = env::var_os("VCPKGRS_DYNAMIC").is_none();
-        if is_vcpkg_static != statik {
-            panic!(
-                "vcpkg settings do not match ffmpeg-sys settings: VCPKGRS_DYNAMIC is {}, but ffmpeg-sys static feature is {}",
-                if is_vcpkg_static { "not defined, which means that vcpkg libraries are linked statically" } else { "defined" },
-                if statik { "specified" } else { "not specified "}
-            );
-        }
-
+    } else if let Some(paths) = try_vcpkg(statik) {
         // vcpkg doesn't detect the "system" dependencies
         if statik {
             if cfg!(feature = "avcodec") || cfg!(feature = "avdevice") {
