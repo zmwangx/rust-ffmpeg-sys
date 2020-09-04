@@ -604,6 +604,15 @@ fn search_include(include_paths: &[PathBuf], header: &str) -> String {
     format!("/usr/include/{}", header)
 }
 
+fn maybe_search_include(include_paths: &[PathBuf], header: &str) -> Option<String> {
+    let path = search_include(include_paths, header);
+    if fs::metadata(&path).is_ok() {
+        Some(path)
+    } else {
+        None
+    }
+}
+
 fn link_to_libraries(statik: bool) {
     let ffmpeg_ty = if statik { "static" } else { "dylib" };
     for lib in LIBRARIES {
@@ -1200,7 +1209,6 @@ fn main() {
         .header(search_include(&include_paths, "libavutil/hash.h"))
         .header(search_include(&include_paths, "libavutil/hmac.h"))
         .header(search_include(&include_paths, "libavutil/hwcontext.h"))
-        .header(search_include(&include_paths, "libavutil/hwcontext_drm.h"))
         .header(search_include(&include_paths, "libavutil/imgutils.h"))
         .header(search_include(&include_paths, "libavutil/lfg.h"))
         .header(search_include(&include_paths, "libavutil/log.h"))
@@ -1241,6 +1249,12 @@ fn main() {
 
     if env::var("CARGO_FEATURE_SWSCALE").is_ok() {
         builder = builder.header(search_include(&include_paths, "libswscale/swscale.h"));
+    }
+
+    if let Some(hwcontext_drm_header) =
+        maybe_search_include(&include_paths, "libavutil/hwcontext_drm.h")
+    {
+        builder = builder.header(hwcontext_drm_header);
     }
 
     // Finish the builder and generate the bindings.
