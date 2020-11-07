@@ -2,17 +2,20 @@ extern crate bindgen;
 extern crate cc;
 extern crate num_cpus;
 extern crate pkg_config;
+extern crate serde_json;
 
 use std::env;
 use std::fs::{self, File};
 use std::io::{self, BufRead, BufReader, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::str;
 
 use bindgen::callbacks::{
     EnumVariantCustomBehavior, EnumVariantValue, IntKind, MacroParsingBehavior, ParseCallbacks,
 };
+
+use serde_json::Value;
 
 #[derive(Debug)]
 struct Library {
@@ -628,6 +631,23 @@ fn link_to_libraries(statik: bool) {
 
 fn main() {
     let statik = env::var("CARGO_FEATURE_STATIC").is_ok();
+
+    // It's often impractical to use an environment variable to specify
+    // FFMPEG_DIR so we also support parsing an environment.json file
+    // Ref: rust-lang/cargo#4121
+    let manifest_dir_env = env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR evironment variable unset");
+    let env_path = Path::new(&manifest_dir_env).join("environment.json");
+    if let Ok(env) = fs::read_to_string(env_path) {
+        let env: Value = serde_json::from_str(&env).expect("Failed to parse environment.json");
+        if let Some(env_map) = env.as_object() {
+            for key in env_map.keys() {
+                if let Some(env_value) = env[key].as_str() {
+                    // Simply re-export as an actual environment variable for consistent handling below...
+                    env::set_var(key, env_value);
+                }
+            }
+        }
+    }
 
     let include_paths: Vec<PathBuf> = if env::var("CARGO_FEATURE_BUILD").is_ok() {
         println!(
