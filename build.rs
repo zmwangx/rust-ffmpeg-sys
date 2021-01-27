@@ -1236,7 +1236,7 @@ fn main() {
         "truncl",
         "y0l",
         "y1l",
-        "ynl"
+        "ynl",
     ];
 
     let clang_includes = include_paths
@@ -1264,7 +1264,6 @@ fn main() {
     for func_name in function_blacklist {
         builder = builder.blacklist_function(&func_name);
     }
-
 
     // Finish the builder and generate the bindings.
     let bindings = builder
