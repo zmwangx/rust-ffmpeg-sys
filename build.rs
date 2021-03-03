@@ -605,15 +605,6 @@ fn search_include(include_paths: &[PathBuf], header: &str) -> String {
     format!("/usr/include/{}", header)
 }
 
-fn maybe_search_include(include_paths: &[PathBuf], header: &str) -> Option<String> {
-    let path = search_include(include_paths, header);
-    if fs::metadata(&path).is_ok() {
-        Some(path)
-    } else {
-        None
-    }
-}
-
 fn link_to_libraries(statik: bool) {
     let ffmpeg_ty = if statik { "static" } else { "dylib" };
     for lib in LIBRARIES {
@@ -1224,7 +1215,6 @@ fn thread_main() {
         .header(search_include(&include_paths, "libavutil/frame.h"))
         .header(search_include(&include_paths, "libavutil/hash.h"))
         .header(search_include(&include_paths, "libavutil/hmac.h"))
-        .header(search_include(&include_paths, "libavutil/hwcontext.h"))
         .header(search_include(&include_paths, "libavutil/imgutils.h"))
         .header(search_include(&include_paths, "libavutil/lfg.h"))
         .header(search_include(&include_paths, "libavutil/log.h"))
@@ -1253,7 +1243,8 @@ fn thread_main() {
         .header(search_include(&include_paths, "libavutil/timecode.h"))
         .header(search_include(&include_paths, "libavutil/twofish.h"))
         .header(search_include(&include_paths, "libavutil/avutil.h"))
-        .header(search_include(&include_paths, "libavutil/xtea.h"));
+        .header(search_include(&include_paths, "libavutil/xtea.h"))
+        .header(search_include(&include_paths, "libavutil/hwcontext.h"));
 
     if env::var("CARGO_FEATURE_POSTPROC").is_ok() {
         builder = builder.header(search_include(&include_paths, "libpostproc/postprocess.h"));
@@ -1267,10 +1258,8 @@ fn thread_main() {
         builder = builder.header(search_include(&include_paths, "libswscale/swscale.h"));
     }
 
-    if let Some(hwcontext_drm_header) =
-        maybe_search_include(&include_paths, "libavutil/hwcontext_drm.h")
-    {
-        builder = builder.header(hwcontext_drm_header);
+    if env::var("CARGO_FEATURE_LIB_DRM").is_ok() {
+        builder = builder.header(search_include(&include_paths, "libavutil/hwcontext_drm.h"))
     }
 
     // Finish the builder and generate the bindings.
