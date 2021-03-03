@@ -621,7 +621,9 @@ fn link_to_libraries(statik: bool) {
 fn main() {
     // The long chain of `header` method calls for `bindgen::Builder` seems to be overflowing the default stack size on Windows.
     // The main thread appears to have a hardcoded stack size which is unaffected by `RUST_MIN_STACK`. As a workaround, spawn a thread here with a stack size that works expermentally, and allow overriding it with `FFMPEG_SYS_BUILD_STACK_SIZE` just in case.
-    let stack_size = std::env::var("FFMPEG_SYS_BUILD_STACK_SIZE").map(|s| s.parse()).unwrap_or(Ok(3 * 1024 * 1024));
+    let stack_size = std::env::var("FFMPEG_SYS_BUILD_STACK_SIZE")
+        .map(|s| s.parse())
+        .unwrap_or(Ok(3 * 1024 * 1024));
     eprintln!("Using stack size: {:?}", stack_size);
 
     std::thread::Builder::new()
@@ -719,11 +721,14 @@ fn thread_main() {
 
         for (lib_name, env_variable_name) in libs.iter() {
             if env::var(format!("CARGO_FEATURE_{}", env_variable_name)).is_ok() {
-                print_pkg_config_libs(statik, &pkg_config::Config::new()
-                    .cargo_metadata(false)
-                    .statik(statik)
-                    .probe(lib_name)
-                    .unwrap());
+                print_pkg_config_libs(
+                    statik,
+                    &pkg_config::Config::new()
+                        .cargo_metadata(false)
+                        .statik(statik)
+                        .probe(lib_name)
+                        .unwrap(),
+                );
             }
         }
 
@@ -1316,7 +1321,9 @@ fn print_pkg_config_libs(statik: bool, lib: &pkg_config::Library) {
 
 fn is_static_available(lib: &str, dirs: &[PathBuf]) -> bool {
     let libname = format!("lib{}.a", lib);
-    let has = dirs.iter().map(|d| d.as_path())
+    let has = dirs
+        .iter()
+        .map(|d| d.as_path())
         .chain([Path::new("/usr/local/lib")].iter().copied())
         .any(|dir| dir.join(&libname).exists());
     if !has {
