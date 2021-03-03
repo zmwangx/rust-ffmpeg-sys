@@ -1,9 +1,10 @@
 [package]
-name    = "ffmpeg-sys-next"
+name    = "ffmpeg-sys"
 version = "4.3.5"
 build   = "build.rs"
 links   = "ffmpeg"
 
+readme = "README.md"
 authors = ["meh. <meh@schizofreni.co>", "Zhiming Wang <i@zhimingwang.org>"]
 license = "WTFPL"
 
@@ -22,7 +23,7 @@ libc = "0.2"
 num_cpus   = "1.11"
 cc         = "1.0"
 pkg-config = "0.3"
-bindgen    = { version = "0.54", default-features = false, features = ["runtime"] }
+bindgen    = { version = "0.56", default-features = false, features = ["runtime"] }
 
 [target.'cfg(target_env = "msvc")'.build-dependencies]
 vcpkg = "0.2"
@@ -104,3 +105,4 @@ avresample = []
 postproc   = []
 swresample = []
 swscale    = []
+lib-drm    = []

@@ -6,7 +6,7 @@ extern crate pkg_config;
 use std::env;
 use std::fs::{self, File};
 use std::io::{self, BufRead, BufReader, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::str;
 
@@ -225,6 +225,7 @@ fn build() -> io::Result<()> {
     if env::var("DEBUG").is_ok() {
         configure.arg("--enable-debug");
         configure.arg("--disable-stripping");
+        configure.arg("--disable-optimizations");
     } else {
         configure.arg("--disable-debug");
         configure.arg("--enable-stripping");
@@ -604,15 +605,6 @@ fn search_include(include_paths: &[PathBuf], header: &str) -> String {
     format!("/usr/include/{}", header)
 }
 
-fn maybe_search_include(include_paths: &[PathBuf], header: &str) -> Option<String> {
-    let path = search_include(include_paths, header);
-    if fs::metadata(&path).is_ok() {
-        Some(path)
-    } else {
-        None
-    }
-}
-
 fn link_to_libraries(statik: bool) {
     let ffmpeg_ty = if statik { "static" } else { "dylib" };
     for lib in LIBRARIES {
@@ -627,6 +619,23 @@ fn link_to_libraries(statik: bool) {
 }
 
 fn main() {
+    // The long chain of `header` method calls for `bindgen::Builder` seems to be overflowing the default stack size on Windows.
+    // The main thread appears to have a hardcoded stack size which is unaffected by `RUST_MIN_STACK`. As a workaround, spawn a thread here with a stack size that works expermentally, and allow overriding it with `FFMPEG_SYS_BUILD_STACK_SIZE` just in case.
+    let stack_size = std::env::var("FFMPEG_SYS_BUILD_STACK_SIZE")
+        .map(|s| s.parse())
+        .unwrap_or(Ok(3 * 1024 * 1024));
+    eprintln!("Using stack size: {:?}", stack_size);
+
+    std::thread::Builder::new()
+        .name("ffmpg-sys-build".into())
+        .stack_size(stack_size.unwrap())
+        .spawn(thread_main)
+        .unwrap()
+        .join()
+        .unwrap();
+}
+
+fn thread_main() {
     let statik = env::var("CARGO_FEATURE_STATIC").is_ok();
 
     let include_paths: Vec<PathBuf> = if env::var("CARGO_FEATURE_BUILD").is_ok() {
@@ -694,10 +703,12 @@ fn main() {
     }
     // Fallback to pkg-config
     else {
-        pkg_config::Config::new()
+        let mut libavutil = pkg_config::Config::new()
+            .cargo_metadata(false)
             .statik(statik)
             .probe("libavutil")
             .unwrap();
+        print_pkg_config_libs(statik, &libavutil);
 
         let libs = vec![
             ("libavformat", "AVFORMAT"),
@@ -710,18 +721,27 @@ fn main() {
 
         for (lib_name, env_variable_name) in libs.iter() {
             if env::var(format!("CARGO_FEATURE_{}", env_variable_name)).is_ok() {
-                pkg_config::Config::new()
-                    .statik(statik)
-                    .probe(lib_name)
-                    .unwrap();
+                print_pkg_config_libs(
+                    statik,
+                    &pkg_config::Config::new()
+                        .cargo_metadata(false)
+                        .statik(statik)
+                        .probe(lib_name)
+                        .unwrap(),
+                );
             }
         }
 
-        pkg_config::Config::new()
+        let libavcodec = pkg_config::Config::new()
+            .cargo_metadata(false)
             .statik(statik)
             .probe("libavcodec")
-            .unwrap()
-            .include_paths
+            .unwrap();
+        print_pkg_config_libs(statik, &libavcodec);
+
+        let mut paths = libavcodec.include_paths;
+        paths.append(&mut libavutil.include_paths);
+        paths
     };
 
     if statik && cfg!(target_os = "macos") {
@@ -1208,7 +1228,6 @@ fn main() {
         .header(search_include(&include_paths, "libavutil/frame.h"))
         .header(search_include(&include_paths, "libavutil/hash.h"))
         .header(search_include(&include_paths, "libavutil/hmac.h"))
-        .header(search_include(&include_paths, "libavutil/hwcontext.h"))
         .header(search_include(&include_paths, "libavutil/imgutils.h"))
         .header(search_include(&include_paths, "libavutil/lfg.h"))
         .header(search_include(&include_paths, "libavutil/log.h"))
@@ -1237,7 +1256,8 @@ fn main() {
         .header(search_include(&include_paths, "libavutil/timecode.h"))
         .header(search_include(&include_paths, "libavutil/twofish.h"))
         .header(search_include(&include_paths, "libavutil/avutil.h"))
-        .header(search_include(&include_paths, "libavutil/xtea.h"));
+        .header(search_include(&include_paths, "libavutil/xtea.h"))
+        .header(search_include(&include_paths, "libavutil/hwcontext.h"));
 
     if env::var("CARGO_FEATURE_POSTPROC").is_ok() {
         builder = builder.header(search_include(&include_paths, "libpostproc/postprocess.h"));
@@ -1251,10 +1271,8 @@ fn main() {
         builder = builder.header(search_include(&include_paths, "libswscale/swscale.h"));
     }
 
-    if let Some(hwcontext_drm_header) =
-        maybe_search_include(&include_paths, "libavutil/hwcontext_drm.h")
-    {
-        builder = builder.header(hwcontext_drm_header);
+    if env::var("CARGO_FEATURE_LIB_DRM").is_ok() {
+        builder = builder.header(search_include(&include_paths, "libavutil/hwcontext_drm.h"))
     }
 
     // Finish the builder and generate the bindings.
@@ -1267,4 +1285,49 @@ fn main() {
     bindings
         .write_to_file(output().join("bindings.rs"))
         .expect("Couldn't write bindings!");
+}
+
+fn print_pkg_config_libs(statik: bool, lib: &pkg_config::Library) {
+    let target = env::var("TARGET").unwrap();
+    let is_msvc = target.contains("msvc");
+    let is_apple = target.contains("apple");
+
+    for val in &lib.link_paths {
+        println!("cargo:rustc-link-search=native={}", val.display());
+    }
+    for val in &lib.framework_paths {
+        println!("cargo:rustc-link-search=framework={}", val.display());
+    }
+    for val in &lib.frameworks {
+        println!("cargo:rustc-link=framework={}", val);
+    }
+
+    for val in &lib.libs {
+        if is_msvc && ["m", "c", "pthread"].contains(&val.as_str()) {
+            continue;
+        }
+        if is_apple && val == "stdc++" {
+            println!("cargo:rustc-link-lib=c++");
+            continue;
+        }
+
+        if statik && is_static_available(val, &lib.include_paths) {
+            println!("cargo:rustc-link-lib=static={}", val);
+        } else {
+            println!("cargo:rustc-link-lib={}", val);
+        }
+    }
+}
+
+fn is_static_available(lib: &str, dirs: &[PathBuf]) -> bool {
+    let libname = format!("lib{}.a", lib);
+    let has = dirs
+        .iter()
+        .map(|d| d.as_path())
+        .chain([Path::new("/usr/local/lib")].iter().copied())
+        .any(|dir| dir.join(&libname).exists());
+    if !has {
+        println!("cargo:warning=static {} not found", libname);
+    }
+    has
 }
