@@ -11,7 +11,7 @@ A word on versioning: major and minor versions track major and minor versions of
 
 In addition to feature flags declared in `Cargo.toml`, this crate performs various compile-time version and feature detections and exposes the results in additional flags. These flags are briefly documented below; run `cargo build -vv` to view more details.
 
-- `ffmpeg_<x>_<y>` flags (new in v4.3.2), e.g. `ffmpeg_4_3`, indicating the FFmpeg installation being compiled against is at least version `<x>.<y>`. Currently available:
+- `ffmpeg_<x>_<y>` flags (new in v4.3.2), e.g. `ffmpeg_4_4`, indicating the FFmpeg installation being compiled against is at least version `<x>.<y>`. Currently available:
 
   - `ffmpeg_3_0`
   - `ffmpeg_3_1`
@@ -22,6 +22,7 @@ In addition to feature flags declared in `Cargo.toml`, this crate performs vario
   - `ffmpeg_4_1`
   - `ffmpeg_4_2`
   - `ffmpeg_4_3`
+  - `ffmpeg_4_4`
 
 - `avcodec_version_greater_than_<x>_<y>` (new in v4.3.2), e.g., `avcodec_version_greater_than_58_90`. The name should be self-explanatory.
 
