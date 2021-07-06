@@ -409,7 +409,7 @@ fn check_features(
         }
 
         let include = format!("#include <{}>", header);
-        if includes_code.find(&include).is_none() {
+        if !includes_code.contains(&include) {
             includes_code.push_str(&include);
             includes_code.push_str(&"\n");
         }
