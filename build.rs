@@ -413,7 +413,7 @@ fn check_features(
         let include = format!("#include <{}>", header);
         if !includes_code.contains(&include) {
             includes_code.push_str(&include);
-            includes_code.push_str(&"\n");
+            includes_code.push('\n');
         }
         includes_code.push_str(&format!(
             r#"
@@ -651,7 +651,7 @@ fn main() {
             let reader = BufReader::new(file);
             let extra_libs = reader
                 .lines()
-                .find(|ref line| line.as_ref().unwrap().starts_with("EXTRALIBS"))
+                .find(|line| line.as_ref().unwrap().starts_with("EXTRALIBS"))
                 .map(|line| line.unwrap())
                 .unwrap();
 
