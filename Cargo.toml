@@ -56,10 +56,12 @@ build-lib-ass        = ["build"]
 build-lib-freetype   = ["build"]
 build-lib-freebidi   = ["build"]
 build-lib-opencv     = ["build"]
+build-lib-vmaf       = ["build"]
 
 # encoders/decoders
 build-lib-aacplus          = ["build"]
 build-lib-celt             = ["build"]
+build-lib-dav1d            = ["build"]
 build-lib-dcadec           = ["build"]
 build-lib-faac             = ["build"]
 build-lib-fdk-aac          = ["build"]
