@@ -289,6 +289,7 @@ fn build() -> io::Result<()> {
     enable!(configure, "BUILD_LIB_AACPLUS", "libaacplus");
     enable!(configure, "BUILD_LIB_CELT", "libcelt");
     enable!(configure, "BUILD_LIB_DCADEC", "libdcadec");
+    enable!(configure, "BUILD_LIB_DAV1D", "libdav1d");
     enable!(configure, "BUILD_LIB_FAAC", "libfaac");
     enable!(configure, "BUILD_LIB_FDK_AAC", "libfdk-aac");
     enable!(configure, "BUILD_LIB_GSM", "libgsm");

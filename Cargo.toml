@@ -60,6 +60,7 @@ build-lib-opencv     = ["build"]
 # encoders/decoders
 build-lib-aacplus          = ["build"]
 build-lib-celt             = ["build"]
+build-lib-dav1d            = ["build"]
 build-lib-dcadec           = ["build"]
 build-lib-faac             = ["build"]
 build-lib-fdk-aac          = ["build"]
