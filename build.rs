@@ -213,7 +213,8 @@ fn build() -> io::Result<()> {
         configure.arg(format!("--cross-prefix={}-", prefix));
         let arch_arg = env::var("CARGO_CFG_TARGET_ARCH").unwrap();
         configure.arg(format!(
-            "--arch={}", if arch_arg == "riscv64gc-unknown-linux-gnu" {
+            "--arch={}",
+            if arch_arg == "riscv64gc-unknown-linux-gnu" {
                 String::from("riscv64-unknown-linux-gnu")
             } else {
                 arch_arg
