@@ -403,7 +403,7 @@ fn build(target_os: &str) -> io::Result<()> {
 }
 
 fn os_from_triple(triple: &str) -> &str {
-    let platform = triple.splitn(2, '-').nth(1).expect("bad triple");
+    let platform = triple.split_once('-').map(|x| x.1).expect("bad triple");
     platform
         .trim_start_matches("unknown-")
         .trim_start_matches("pc-")
