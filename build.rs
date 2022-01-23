@@ -267,8 +267,14 @@ fn build() -> io::Result<()> {
     // the binary using ffmpeg-sys cannot be redistributed
     switch(&mut configure, "BUILD_LICENSE_NONFREE", "nonfree");
 
+    let ffmpeg_major_version: u32 = env!("CARGO_PKG_VERSION_MAJOR").parse().unwrap();
+
     // configure building libraries based on features
-    for lib in LIBRARIES.iter().filter(|lib| lib.is_feature) {
+    for lib in LIBRARIES
+        .iter()
+        .filter(|lib| lib.is_feature)
+        .filter(|lib| !(lib.name == "avresample" && ffmpeg_major_version >= 5))
+    {
         switch(&mut configure, &lib.name.to_uppercase(), lib.name);
     }
 
@@ -577,6 +583,7 @@ fn check_features(
         ("ffmpeg_4_2", 58, 54),
         ("ffmpeg_4_3", 58, 91),
         ("ffmpeg_4_4", 58, 100),
+        ("ffmpeg_5_0", 59, 18),
     ];
     for &(ffmpeg_version_flag, lavc_version_major, lavc_version_minor) in
         ffmpeg_lavc_versions.iter()
@@ -631,6 +638,7 @@ fn link_to_libraries(statik: bool) {
 
 fn main() {
     let statik = env::var("CARGO_FEATURE_STATIC").is_ok();
+    let ffmpeg_major_version: u32 = env!("CARGO_PKG_VERSION_MAJOR").parse().unwrap();
 
     let include_paths: Vec<PathBuf> = if env::var("CARGO_FEATURE_BUILD").is_ok() {
         println!(
@@ -702,14 +710,16 @@ fn main() {
             .probe("libavutil")
             .unwrap();
 
-        let libs = vec![
+        let mut libs = vec![
             ("libavformat", "AVFORMAT"),
             ("libavfilter", "AVFILTER"),
             ("libavdevice", "AVDEVICE"),
-            ("libavresample", "AVRESAMPLE"),
             ("libswscale", "SWSCALE"),
             ("libswresample", "SWRESAMPLE"),
         ];
+        if ffmpeg_major_version < 5 {
+            libs.push(("libavresample", "AVRESAMPLE"));
+        }
 
         for (lib_name, env_variable_name) in libs.iter() {
             if env::var(format!("CARGO_FEATURE_{}", env_variable_name)).is_ok() {
@@ -1163,8 +1173,11 @@ fn main() {
             .header(search_include(&include_paths, "libavcodec/avcodec.h"))
             .header(search_include(&include_paths, "libavcodec/dv_profile.h"))
             .header(search_include(&include_paths, "libavcodec/avfft.h"))
-            .header(search_include(&include_paths, "libavcodec/vaapi.h"))
             .header(search_include(&include_paths, "libavcodec/vorbis_parser.h"));
+
+        if ffmpeg_major_version < 5 {
+            builder = builder.header(search_include(&include_paths, "libavcodec/vaapi.h"))
+        }
     }
 
     if env::var("CARGO_FEATURE_AVDEVICE").is_ok() {
