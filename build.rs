@@ -235,7 +235,6 @@ fn build(target_os: &str) -> io::Result<()> {
         } else {
             configure.arg(format!("--target_os={}", target_os));
         }
-
     }
 
     // control debug build
