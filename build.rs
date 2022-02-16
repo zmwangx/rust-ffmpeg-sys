@@ -1160,6 +1160,7 @@ fn main() {
         .blocklist_function("y0l")
         .blocklist_function("y1l")
         .blocklist_function("ynl")
+        .opaque_type("__mingw_ldbl_type_t")
         .rustified_enum("*")
         .prepend_enum_name(false)
         .derive_eq(true)
