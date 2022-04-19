@@ -28,7 +28,7 @@ bindgen    = { version = "0.59", default-features = false, features = ["runtime"
 vcpkg = "0.2"
 
 [features]
-default  = ["avcodec", "avdevice", "avfilter", "avformat", "swresample", "swscale"]
+default  = ["avcodec", "avdevice", "avfilter", "avformat", "swresample", "swscale", "v4l2"]
 
 static = []
 build  = ["static"]
@@ -106,3 +106,4 @@ avresample = []
 postproc   = []
 swresample = []
 swscale    = []
+v4l2       = []
