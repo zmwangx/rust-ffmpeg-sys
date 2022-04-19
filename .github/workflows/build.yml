@@ -2,8 +2,7 @@ name: build
 on:
   push:
   pull_request:
-  schedule:
-    - cron: "0 0 * * *"
+  
 jobs:
   build-test-lint:
     name: FFmpeg ${{ matrix.ffmpeg_version }} - build, test and lint
@@ -14,7 +13,7 @@ jobs:
         ffmpeg_version: ['3.3', '3.4', '4.0', '4.1', '4.2', '4.3', '4.4', '5.0']
       fail-fast: false
     env:
-      FEATURES: avcodec,avdevice,avfilter,avformat,postproc,swresample,swscale
+      FEATURES: avcodec,avdevice,avfilter,avformat,postproc,swresample,swscale,v4l2
     steps:
       - uses: actions/checkout@v2
       - name: Install dependencies
