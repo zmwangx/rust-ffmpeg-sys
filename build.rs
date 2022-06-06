@@ -1176,6 +1176,9 @@ fn main() {
             .header(search_include(&include_paths, "libavcodec/avfft.h"))
             .header(search_include(&include_paths, "libavcodec/vorbis_parser.h"));
 
+        if ffmpeg_major_version >= 5 {
+            builder = builder.header(search_include(&include_paths, "libavcodec/bsf.h"))
+        }
         if ffmpeg_major_version < 5 {
             builder = builder.header(search_include(&include_paths, "libavcodec/vaapi.h"))
         }
