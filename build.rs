@@ -4,6 +4,7 @@ extern crate num_cpus;
 extern crate pkg_config;
 
 use std::env;
+use std::fmt::Write as FmtWrite;
 use std::fs::{self, File};
 use std::io::{self, BufRead, BufReader, Write};
 use std::path::PathBuf;
@@ -421,7 +422,8 @@ fn check_features(
             includes_code.push_str(&include);
             includes_code.push('\n');
         }
-        includes_code.push_str(&format!(
+        let _ = write!(
+            includes_code,
             r#"
             #ifndef {var}_is_defined
             #ifndef {var}
@@ -433,13 +435,14 @@ fn check_features(
             #endif
         "#,
             var = var
-        ));
+        );
 
-        main_code.push_str(&format!(
+        let _ = write!(
+            main_code,
             r#"printf("[{var}]%d%d\n", {var}, {var}_is_defined);
             "#,
             var = var
-        ));
+        );
     }
 
     let version_check_info = [("avcodec", 56, 60, 0, 108)];
@@ -448,13 +451,15 @@ fn check_features(
     {
         for version_major in begin_version_major..end_version_major {
             for version_minor in begin_version_minor..end_version_minor {
-                main_code.push_str(&format!(
+                let _ = write!(
+                    main_code,
                     r#"printf("[{lib}_version_greater_than_{version_major}_{version_minor}]%d\n", LIB{lib_uppercase}_VERSION_MAJOR > {version_major} || (LIB{lib_uppercase}_VERSION_MAJOR == {version_major} && LIB{lib_uppercase}_VERSION_MINOR > {version_minor}));
-                    "#, lib = lib,
+                    "#,
+                    lib = lib,
                     lib_uppercase = lib.to_uppercase(),
                     version_major = version_major,
                     version_minor = version_minor
-                ));
+                );
             }
         }
     }
