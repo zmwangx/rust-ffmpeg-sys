@@ -589,6 +589,7 @@ fn check_features(
         ("ffmpeg_4_3", 58, 91),
         ("ffmpeg_4_4", 58, 100),
         ("ffmpeg_5_0", 59, 18),
+        ("ffmpeg_5_1", 59, 37),
     ];
     for &(ffmpeg_version_flag, lavc_version_major, lavc_version_minor) in
         ffmpeg_lavc_versions.iter()
@@ -1218,6 +1219,9 @@ fn main() {
         .header(search_include(&include_paths, "libavutil/camellia.h"))
         .header(search_include(&include_paths, "libavutil/cast5.h"))
         .header(search_include(&include_paths, "libavutil/channel_layout.h"))
+        // Here until https://github.com/rust-lang/rust-bindgen/issues/2192 /
+        // https://github.com/rust-lang/rust-bindgen/issues/258 is fixed.
+        .header("channel_layout_fixed.h")
         .header(search_include(&include_paths, "libavutil/cpu.h"))
         .header(search_include(&include_paths, "libavutil/crc.h"))
         .header(search_include(&include_paths, "libavutil/dict.h"))
