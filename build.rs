@@ -83,7 +83,7 @@ impl ParseCallbacks for Callbacks {
         
         //fixed unecessary type casting
         if value >= i64::min_value() 
-            && value <= i64::max_value() 
+            && value < i64::max_value() 
             && _name.starts_with(ch_layout_prefix)
         {
             Some(IntKind::ULongLong)
