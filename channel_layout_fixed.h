@@ -2,7 +2,7 @@
 // https://github.com/rust-lang/rust-bindgen/issues/258 is fixed.
 #include <libavutil/channel_layout.h>
 
-#if LIBAVUTIL_VERSION_MAJOR >= 57 && LIBAVUTIL_VERSION_MINOR >= 28
+#if (LIBAVUTIL_VERSION_MAJOR >= 57 && LIBAVUTIL_VERSION_MINOR >= 28) || LIBAVUTIL_VERSION_MAJOR >= 58
 
 #undef AV_CH_FRONT_LEFT
 #undef AV_CH_FRONT_RIGHT

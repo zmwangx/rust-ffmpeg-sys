@@ -445,7 +445,7 @@ fn check_features(
         );
     }
 
-    let version_check_info = [("avcodec", 56, 60, 0, 108)];
+    let version_check_info = [("avcodec", 56, 61, 0, 108)];
     for &(lib, begin_version_major, end_version_major, begin_version_minor, end_version_minor) in
         version_check_info.iter()
     {
@@ -590,6 +590,7 @@ fn check_features(
         ("ffmpeg_4_4", 58, 100),
         ("ffmpeg_5_0", 59, 18),
         ("ffmpeg_5_1", 59, 37),
+        ("ffmpeg_6_0", 60, 4),
     ];
     for &(ffmpeg_version_flag, lavc_version_major, lavc_version_minor) in
         ffmpeg_lavc_versions.iter()
@@ -1168,6 +1169,7 @@ fn main() {
         .blocklist_function("ynl")
         .opaque_type("__mingw_ldbl_type_t")
         .rustified_enum("*")
+        .default_enum_style(bindgen::EnumVariation::Rust { non_exhaustive: false })
         .prepend_enum_name(false)
         .derive_eq(true)
         .size_t_is_usize(true)
