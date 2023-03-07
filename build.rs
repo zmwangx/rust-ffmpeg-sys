@@ -1165,7 +1165,6 @@ fn main() {
         .blocklist_function("y1l")
         .blocklist_function("ynl")
         .opaque_type("__mingw_ldbl_type_t")
-        .rustified_enum("*")
         .default_enum_style(bindgen::EnumVariation::Rust {
             non_exhaustive: false,
         })
@@ -1173,6 +1172,12 @@ fn main() {
         .derive_eq(true)
         .size_t_is_usize(true)
         .parse_callbacks(Box::new(Callbacks));
+
+    if env::var("CARGO_FEATURE_NON_EXHAUSTIVE_ENUMS").is_ok() {
+        builder = builder.rustified_non_exhaustive_enum("*");
+    } else {
+        builder = builder.rustified_enum("*");
+    }
 
     // The input headers we would like to generate
     // bindings for.

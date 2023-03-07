@@ -33,6 +33,9 @@ default  = ["avcodec", "avdevice", "avfilter", "avformat", "swresample", "swscal
 static = []
 build  = ["static"]
 
+# mark enums in generated bindings as #[non_exhaustive]
+non-exhaustive-enums = []
+
 # licensing
 build-license-gpl      = ["build"]
 build-license-nonfree  = ["build"]
