@@ -1166,7 +1166,9 @@ fn main() {
         .blocklist_function("ynl")
         .opaque_type("__mingw_ldbl_type_t")
         .rustified_enum("*")
-        .default_enum_style(bindgen::EnumVariation::Rust { non_exhaustive: false })
+        .default_enum_style(bindgen::EnumVariation::Rust {
+            non_exhaustive: false,
+        })
         .prepend_enum_name(false)
         .derive_eq(true)
         .size_t_is_usize(true)
