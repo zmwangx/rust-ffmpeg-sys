@@ -80,10 +80,7 @@ impl ParseCallbacks for Callbacks {
         let codec_flag_prefix = "AV_CODEC_FLAG_";
         let error_max_size = "AV_ERROR_MAX_STRING_SIZE";
 
-        if value >= i64::min_value() as i64
-            && value <= i64::max_value() as i64
-            && _name.starts_with(ch_layout_prefix)
-        {
+        if value >= i64::min_value() && _name.starts_with(ch_layout_prefix) {
             Some(IntKind::ULongLong)
         } else if value >= i32::min_value() as i64
             && value <= i32::max_value() as i64
@@ -632,7 +629,7 @@ fn maybe_search_include(include_paths: &[PathBuf], header: &str) -> Option<Strin
 fn link_to_libraries(statik: bool) {
     let ffmpeg_ty = if statik { "static" } else { "dylib" };
     for lib in LIBRARIES {
-        let feat_is_enabled = lib.feature_name().and_then(|f| env::var(&f).ok()).is_some();
+        let feat_is_enabled = lib.feature_name().and_then(|f| env::var(f).ok()).is_some();
         if !lib.is_feature || feat_is_enabled {
             println!("cargo:rustc-link-lib={}={}", ffmpeg_ty, lib.name);
         }
