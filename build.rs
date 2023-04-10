@@ -187,7 +187,7 @@ fn switch(configure: &mut Command, feature: &str, name: &str) {
     configure.arg(arg.to_string() + name);
 }
 
-fn build() -> io::Result<()> {
+fn build(target_os: &str) -> io::Result<()> {
     let source_dir = source();
 
     // Command's path is not relative to command's current_dir
@@ -198,25 +198,41 @@ fn build() -> io::Result<()> {
 
     configure.arg(format!("--prefix={}", search().to_string_lossy()));
 
-    if env::var("TARGET").unwrap() != env::var("HOST").unwrap() {
+    let target = env::var("TARGET").unwrap();
+    let host = env::var("HOST").unwrap();
+    if target != host {
+        configure.arg("--enable-cross-compile");
+
         // Rust targets are subtly different than naming scheme for compiler prefixes.
         // The cc crate has the messy logic of guessing a working prefix,
         // and this is a messy way of reusing that logic.
         let cc = cc::Build::new();
+
+        // Apple-clang needs this, -arch is not enough.
+        let target_flag = format!("--target={}", target);
+        if cc.is_flag_supported(&target_flag).unwrap_or(false) {
+            configure.arg(format!("--extra-cflags={}", target_flag));
+            configure.arg(format!("--extra-ldflags={}", target_flag));
+        }
+
         let compiler = cc.get_compiler();
         let compiler = compiler.path().file_stem().unwrap().to_str().unwrap();
-        let suffix_pos = compiler.rfind('-').unwrap(); // cut off "-gcc"
-        let prefix = compiler[0..suffix_pos].trim_end_matches("-wr"); // "wr-c++" compiler
+        if let Some(suffix_pos) = compiler.rfind('-') {
+            // cut off "-gcc"
+            let prefix = compiler[0..suffix_pos].trim_end_matches("-wr"); // "wr-c++" compiler
+            configure.arg(format!("--cross-prefix={}-", prefix));
+        }
 
-        configure.arg(format!("--cross-prefix={}-", prefix));
         configure.arg(format!(
             "--arch={}",
             env::var("CARGO_CFG_TARGET_ARCH").unwrap()
         ));
-        configure.arg(format!(
-            "--target_os={}",
-            env::var("CARGO_CFG_TARGET_OS").unwrap()
-        ));
+        if target_os == "windows" {
+            // fix `configure: Unknown OS 'windows'`
+            configure.arg(format!("--target_os={}", "mingw32"));
+        } else {
+            configure.arg(format!("--target_os={}", target_os));
+        }
     }
 
     // control debug build
@@ -341,6 +357,8 @@ fn build() -> io::Result<()> {
     // configure misc build options
     enable!(configure, "BUILD_PIC", "pic");
 
+    println!("configure cmd: {:?}", configure);
+
     // run ./configure
     let output = configure
         .output()
@@ -379,6 +397,19 @@ fn build() -> io::Result<()> {
     }
 
     Ok(())
+}
+
+fn os_from_triple(triple: &str) -> &str {
+    let platform = triple.split_once('-').map(|x| x.1).expect("bad triple");
+    platform
+        .trim_start_matches("unknown-")
+        .trim_start_matches("pc-")
+        .trim_start_matches("wrs-")
+        .trim_start_matches("apple-")
+        .trim_start_matches("uwp-")
+        .split('-')
+        .next()
+        .unwrap()
 }
 
 #[cfg(not(target_env = "msvc"))]
@@ -627,7 +658,7 @@ fn maybe_search_include(include_paths: &[PathBuf], header: &str) -> Option<Strin
     }
 }
 
-fn link_to_libraries(statik: bool) {
+fn link_to_libraries(statik: bool, target_os: &str) {
     let ffmpeg_ty = if statik { "static" } else { "dylib" };
     for lib in LIBRARIES {
         let feat_is_enabled = lib.feature_name().and_then(|f| env::var(f).ok()).is_some();
@@ -635,7 +666,7 @@ fn link_to_libraries(statik: bool) {
             println!("cargo:rustc-link-lib={}={}", ffmpeg_ty, lib.name);
         }
     }
-    if env::var("CARGO_FEATURE_BUILD_ZLIB").is_ok() && cfg!(target_os = "linux") {
+    if env::var("CARGO_FEATURE_BUILD_ZLIB").is_ok() && target_os == "linux" {
         println!("cargo:rustc-link-lib=z");
     }
 }
@@ -643,17 +674,19 @@ fn link_to_libraries(statik: bool) {
 fn main() {
     let statik = env::var("CARGO_FEATURE_STATIC").is_ok();
     let ffmpeg_major_version: u32 = env!("CARGO_PKG_VERSION_MAJOR").parse().unwrap();
+    let target = env::var("TARGET").unwrap();
+    let target_os = os_from_triple(&target); // it's different than Rust's target_os! but ./configure likes these better
 
     let include_paths: Vec<PathBuf> = if env::var("CARGO_FEATURE_BUILD").is_ok() {
         println!(
             "cargo:rustc-link-search=native={}",
             search().join("lib").to_string_lossy()
         );
-        link_to_libraries(statik);
+        link_to_libraries(statik, target_os);
         if fs::metadata(&search().join("lib").join("libavutil.a")).is_err() {
             fs::create_dir_all(&output()).expect("failed to create build directory");
             fetch().unwrap();
-            build().unwrap();
+            build(target_os).unwrap();
         }
 
         // Check additional required libraries.
@@ -686,7 +719,7 @@ fn main() {
             "cargo:rustc-link-search=native={}",
             ffmpeg_dir.join("lib").to_string_lossy()
         );
-        link_to_libraries(statik);
+        link_to_libraries(statik, target_os);
         vec![ffmpeg_dir.join("include")]
     } else if let Some(paths) = try_vcpkg(statik) {
         // vcpkg doesn't detect the "system" dependencies
@@ -741,7 +774,7 @@ fn main() {
             .include_paths
     };
 
-    if statik && cfg!(target_os = "macos") {
+    if statik && target_os == "darwin" {
         let frameworks = vec![
             "AppKit",
             "AudioToolbox",
