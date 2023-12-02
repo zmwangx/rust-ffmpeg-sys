@@ -651,8 +651,8 @@ fn main() {
             search().join("lib").to_string_lossy()
         );
         link_to_libraries(statik);
-        if fs::metadata(&search().join("lib").join("libavutil.a")).is_err() {
-            fs::create_dir_all(&output()).expect("failed to create build directory");
+        if fs::metadata(search().join("lib").join("libavutil.a")).is_err() {
+            fs::create_dir_all(output()).expect("failed to create build directory");
             fetch().unwrap();
             build().unwrap();
         }
