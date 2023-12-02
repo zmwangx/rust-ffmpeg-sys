@@ -54,7 +54,7 @@ jobs:
         run: |
           sudo apt update
           sudo apt install -y software-properties-common
-          sudo add-apt-repository -y ppa:savoury1/ffmpeg
+          sudo add-apt-repository -y ppa:savoury1/ffmpeg4
           sudo add-apt-repository -y ppa:savoury1/ffmpeg6
           sudo apt update
           sudo apt-get upgrade && sudo apt-get dist-upgrade
