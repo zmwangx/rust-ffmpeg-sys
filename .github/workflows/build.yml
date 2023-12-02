@@ -65,7 +65,7 @@ jobs:
           sudo apt --fix-broken install
           sudo apt-get update && sudo apt-get upgrade
           sudo dpkg --configure -a
-          sudo apt-get install -f
+          sudo apt-get install -f libavdevice60 libavfilter9 libavformat60 libavcodec60
           sudo aptitude -y -f install libavcodec-dev libavdevice-dev libavfilter-dev libavformat-dev
           sudo aptitude -y -f install ffmpeg libavutil-dev libswresample-dev
       - name: Set up Rust
