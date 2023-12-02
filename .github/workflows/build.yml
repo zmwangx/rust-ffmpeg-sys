@@ -57,9 +57,10 @@ jobs:
           sudo add-apt-repository -y ppa:savoury1/ffmpeg6
           sudo add-apt-repository -y ppa:savoury1/ffmpeg4
           sudo apt update
+          sudo apt install -y aptitude
           sudo apt install -y -f clang curl pkg-config
-          sudo apt install -y -f libavcodec-dev libavdevice-dev libavfilter-dev libavformat-dev
-          sudo apt install -y -f ffmpeg libavutil-dev libswresample-dev
+          sudo aptitude -y -f install libavcodec-dev libavdevice-dev libavfilter-dev libavformat-dev
+          sudo aptitude -y -f install ffmpeg libavutil-dev libswresample-dev
       - name: Set up Rust
         uses: actions-rs/toolchain@v1
         with:
