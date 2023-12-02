@@ -59,6 +59,13 @@ jobs:
           sudo apt update
           sudo apt install -y aptitude
           sudo apt install -y -f clang curl pkg-config
+          sudo apt-get update
+          sudo apt-get clean
+          sudo apt-get autoremove
+          sudo apt --fix-broken install
+          sudo apt-get update && sudo apt-get upgrade
+          sudo dpkg --configure -a
+          sudo apt-get install -f
           sudo aptitude -y -f install libavcodec-dev libavdevice-dev libavfilter-dev libavformat-dev
           sudo aptitude -y -f install ffmpeg libavutil-dev libswresample-dev
       - name: Set up Rust
