@@ -39,8 +39,9 @@ jobs:
       - name: Check format
         run: |
           cargo fmt -- --check
-  # Added only because there is no ffmpeg6.1 docker image here yet
+  # Added only because there is no ffmpeg7.0 docker image here yet
   # https://github.com/jrottenberg/ffmpeg
+  # Note that postproc feature is not tested here
   build-test-lint-7-0:
     name: FFmpeg 7.0 - build, test and lint
     runs-on: ubuntu-latest
