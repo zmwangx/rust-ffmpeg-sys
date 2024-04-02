@@ -54,11 +54,13 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt update
-          sudo apt install -y --no-install-recommends clang curl pkg-config xz-utils libpostproc-dev
+          sudo apt install -y software-properties-common
+          sudo add-apt-repository ppa:ubuntuhandbook1/ffmpeg6
+          sudo apt update
+          sudo apt install -y --no-install-recommends clang curl pkg-config xz-utils libavutil-dev libavcodec-dev libavformat-dev libavfilter-dev libavfilter-dev libavdevice-dev libswresample-dev
           curl -L https://sourceforge.net/projects/avbuild/files/linux/ffmpeg-7.0-linux-clang-default.tar.xz/download -o ffmpeg.tar.xz
           tar -xf ffmpeg.tar.xz
           pwd
-          ls -al
       - name: Set up Rust
         uses: actions-rs/toolchain@v1
         with:
