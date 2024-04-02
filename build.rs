@@ -684,10 +684,33 @@ fn main() {
     // Use prebuilt library
     else if let Ok(ffmpeg_dir) = env::var("FFMPEG_DIR") {
         let ffmpeg_dir = PathBuf::from(ffmpeg_dir);
-        println!(
-            "cargo:rustc-link-search=native={}",
-            ffmpeg_dir.join("lib").to_string_lossy()
-        );
+        if ffmpeg_dir.join("lib/amd64").exists()
+            && env::var("CARGO_CFG_TARGET_ARCH").as_deref() == Ok("x86_64")
+        {
+            println!(
+                "cargo:rustc-link-search=native={}",
+                ffmpeg_dir.join("lib/amd64").to_string_lossy()
+            );
+        } else if ffmpeg_dir.join("lib/armhf").exists()
+            && env::var("CARGO_CFG_TARGET_ARCH").as_deref() == Ok("arm")
+        {
+            println!(
+                "cargo:rustc-link-search=native={}",
+                ffmpeg_dir.join("lib/armhf").to_string_lossy()
+            );
+        } else if ffmpeg_dir.join("lib/arm64").exists()
+            && env::var("CARGO_CFG_TARGET_ARCH").as_deref() == Ok("aarch64")
+        {
+            println!(
+                "cargo:rustc-link-search=native={}",
+                ffmpeg_dir.join("lib/arm64").to_string_lossy()
+            );
+        } else {
+            println!(
+                "cargo:rustc-link-search=native={}",
+                ffmpeg_dir.join("lib").to_string_lossy()
+            );
+        }
         link_to_libraries(statik);
         vec![ffmpeg_dir.join("include")]
     } else if let Some(paths) = try_vcpkg(statik) {
