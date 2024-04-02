@@ -39,3 +39,41 @@ jobs:
       - name: Check format
         run: |
           cargo fmt -- --check
+  # Added only because there is no ffmpeg7.0 docker image here yet
+  # https://github.com/jrottenberg/ffmpeg
+  # Note that postproc feature is not tested here
+  build-test-lint-7-0:
+    name: FFmpeg 7.0 - build, test and lint
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+    env:
+      FEATURES: avcodec,avdevice,avfilter,avformat,swresample,swscale #,postproc
+      FFMPEG_DIR: /home/runner/work/rust-ffmpeg-sys/rust-ffmpeg-sys/ffmpeg-7.0-linux-clang-default
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y --no-install-recommends clang curl pkg-config xz-utils
+          curl -L https://sourceforge.net/projects/avbuild/files/linux/ffmpeg-7.0-linux-clang-default.tar.xz/download -o ffmpeg.tar.xz
+          tar -xf ffmpeg.tar.xz
+          pwd
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+          components: rustfmt, clippy
+      - name: Build
+        run: |
+          cargo build --features $FEATURES
+      - name: Test
+        run: |
+          cargo test --features $FEATURES
+      - name: Lint
+        run: |
+          cargo clippy --features $FEATURES -- -D warnings
+      - name: Check format
+        run: |
+          cargo fmt -- --check
