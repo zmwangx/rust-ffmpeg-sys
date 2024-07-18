@@ -193,29 +193,46 @@ fn build() -> io::Result<()> {
     // Command's path is not relative to command's current_dir
     let configure_path = source_dir.join("configure");
     assert!(configure_path.exists());
-    let mut configure = Command::new(&configure_path);
+    let mut configure = Command::new("sh"); // use sh to allow Windows MinGW to run configure
+    configure.arg(&configure_path);
     configure.current_dir(&source_dir);
 
     configure.arg(format!("--prefix={}", search().to_string_lossy()));
+
+    let is_windows_gnu = env::var("TARGET").unwrap().ends_with("-windows-gnu");
 
     if env::var("TARGET").unwrap() != env::var("HOST").unwrap() {
         // Rust targets are subtly different than naming scheme for compiler prefixes.
         // The cc crate has the messy logic of guessing a working prefix,
         // and this is a messy way of reusing that logic.
-        let cc = cc::Build::new();
-        let compiler = cc.get_compiler();
-        let compiler = compiler.path().file_stem().unwrap().to_str().unwrap();
-        let suffix_pos = compiler.rfind('-').unwrap(); // cut off "-gcc"
-        let prefix = compiler[0..suffix_pos].trim_end_matches("-wr"); // "wr-c++" compiler
+        if !is_windows_gnu {
+            let cc = cc::Build::new();
+            let compiler = cc.get_compiler();
+            let compiler = compiler.path().file_stem().unwrap().to_str().unwrap();
+            let suffix_pos = compiler.rfind('-').unwrap(); // cut off "-gcc"
+            let prefix = compiler[0..suffix_pos].trim_end_matches("-wr"); // "wr-c++" compiler
+            configure.arg(format!("--cross-prefix={}-", prefix));
+        } else {
+            let target = env::var("TARGET").unwrap();
+            let suffix_pos = target.rfind('-').unwrap(); // cut off "-gcc"
+            let stem = &target[0..suffix_pos + 1];
+            configure.arg(format!(
+                "--cross-prefix={}",
+                stem.replace("pc-windows", "w64-mingw32")
+            ));
+        }
 
-        configure.arg(format!("--cross-prefix={}-", prefix));
         configure.arg(format!(
             "--arch={}",
             env::var("CARGO_CFG_TARGET_ARCH").unwrap()
         ));
         configure.arg(format!(
             "--target_os={}",
-            env::var("CARGO_CFG_TARGET_OS").unwrap()
+            if is_windows_gnu {
+                "mingw32".to_string()
+            } else {
+                env::var("CARGO_CFG_TARGET_OS").unwrap()
+            }
         ));
     }
 
