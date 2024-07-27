@@ -610,6 +610,8 @@ fn check_features(
         if &stdout[pos..pos + 1] == "1" {
             println!(r#"cargo:rustc-cfg=feature="{}""#, ffmpeg_version_flag);
             println!(r#"cargo:{}=true"#, ffmpeg_version_flag);
+        } else {
+            println!(r#"cargo:{}="#, ffmpeg_version_flag);
         }
     }
 }
