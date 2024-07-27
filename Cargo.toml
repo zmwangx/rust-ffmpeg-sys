@@ -1,6 +1,6 @@
 [package]
 name    = "ffmpeg-sys-next"
-version = "7.0.0"
+version = "7.0.1"
 build   = "build.rs"
 links   = "ffmpeg"
 

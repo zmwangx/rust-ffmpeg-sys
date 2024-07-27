@@ -80,10 +80,10 @@ impl ParseCallbacks for Callbacks {
         let codec_flag_prefix = "AV_CODEC_FLAG_";
         let error_max_size = "AV_ERROR_MAX_STRING_SIZE";
 
-        if value >= i64::min_value() && _name.starts_with(ch_layout_prefix) {
+        if _name.starts_with(ch_layout_prefix) {
             Some(IntKind::ULongLong)
-        } else if value >= i32::min_value() as i64
-            && value <= i32::max_value() as i64
+        } else if value >= i32::MIN as i64
+            && value <= i32::MAX as i64
             && (_name.starts_with(codec_cap_prefix) || _name.starts_with(codec_flag_prefix))
         {
             Some(IntKind::UInt)
@@ -92,7 +92,7 @@ impl ParseCallbacks for Callbacks {
                 name: "usize",
                 is_signed: false,
             })
-        } else if value >= i32::min_value() as i64 && value <= i32::max_value() as i64 {
+        } else if value >= i32::MIN as i64 && value <= i32::MAX as i64 {
             Some(IntKind::Int)
         } else {
             None
@@ -151,7 +151,7 @@ fn source() -> PathBuf {
 
 fn search() -> PathBuf {
     let mut absolute = env::current_dir().unwrap();
-    absolute.push(&output());
+    absolute.push(output());
     absolute.push("dist");
 
     absolute
@@ -361,7 +361,7 @@ fn build() -> io::Result<()> {
     if !Command::new("make")
         .arg("-j")
         .arg(num_cpus::get().to_string())
-        .current_dir(&source())
+        .current_dir(source())
         .status()?
         .success()
     {
@@ -370,7 +370,7 @@ fn build() -> io::Result<()> {
 
     // run make install
     if !Command::new("make")
-        .current_dir(&source())
+        .current_dir(source())
         .arg("install")
         .status()?
         .success()
@@ -525,6 +525,10 @@ fn check_features(
                 continue;
             }
         }
+        // Here so the features are listed for rust-ffmpeg at build time. Does
+        // NOT represent activated features, just features that exist (hence the
+        // lack of "=true" at the end)
+        println!(r#"cargo:{}="#, var);
 
         let var_str = format!("[{var}]", var = var);
         let pos = var_str.len()
