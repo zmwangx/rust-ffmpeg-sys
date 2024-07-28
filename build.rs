@@ -649,6 +649,8 @@ fn link_to_libraries(statik: bool) {
 }
 
 fn main() {
+    println!("cargo::rerun-if-env-changed=FFMPEG_DIR");
+
     let statik = env::var("CARGO_FEATURE_STATIC").is_ok();
     let ffmpeg_major_version: u32 = env!("CARGO_PKG_VERSION_MAJOR").parse().unwrap();
 
