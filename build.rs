@@ -187,6 +187,14 @@ fn switch(configure: &mut Command, feature: &str, name: &str) {
     configure.arg(arg.to_string() + name);
 }
 
+fn get_ffmpet_target_os() -> String {
+    let cargo_target_os = env::var("CARGO_CFG_TARGET_OS").unwrap();
+    match cargo_target_os.as_str() {
+        "ios" => "darwin".to_string(),
+        _ => cargo_target_os,
+    }
+}
+
 fn build() -> io::Result<()> {
     let source_dir = source();
 
@@ -217,18 +225,15 @@ fn build() -> io::Result<()> {
 
         let compiler = cc.get_compiler();
         let compiler = compiler.path().file_stem().unwrap().to_str().unwrap();
-        let suffix_pos = compiler.rfind('-').unwrap(); // cut off "-gcc"
-        let prefix = compiler[0..suffix_pos].trim_end_matches("-wr"); // "wr-c++" compiler
-
-        configure.arg(format!("--cross-prefix={}-", prefix));
+        if let Some(suffix_pos) = compiler.rfind('-') {
+            let prefix = compiler[0..suffix_pos].trim_end_matches("-wr"); // "wr-c++" compiler
+            configure.arg(format!("--cross-prefix={}-", prefix));
+        }
         configure.arg(format!(
             "--arch={}",
             env::var("CARGO_CFG_TARGET_ARCH").unwrap()
         ));
-        configure.arg(format!(
-            "--target_os={}",
-            env::var("CARGO_CFG_TARGET_OS").unwrap()
-        ));
+        configure.arg(format!("--target_os={}", get_ffmpet_target_os()));
     }
 
     // control debug build
