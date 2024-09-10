@@ -1367,8 +1367,4 @@ fn main() {
     bindings
         .write_to_file(output().join("bindings.rs"))
         .expect("Couldn't write bindings!");
-
-    unsafe {
-        env::set_var("FFMPEG_SYS_INCLUDE_PATH", include_paths.first().unwrap());
-    }
 }
