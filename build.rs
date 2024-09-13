@@ -248,6 +248,7 @@ fn build() -> io::Result<()> {
     // make it static
     configure.arg("--enable-static");
     configure.arg("--disable-shared");
+    configure.arg("--enable-pthreads");
 
     configure.arg("--enable-pic");
 
@@ -686,20 +687,50 @@ fn main() {
             let config_mak = source().join("ffbuild/config.mak");
             let file = File::open(config_mak).unwrap();
             let reader = BufReader::new(file);
-            let extra_libs = reader
+            let extra_linker_args = reader
                 .lines()
-                .find(|line| line.as_ref().unwrap().starts_with("EXTRALIBS"))
-                .map(|line| line.unwrap())
-                .unwrap();
+                .filter_map(|line| {
+                    let line = line.as_ref().ok()?;
 
-            let linker_args = extra_libs.split('=').last().unwrap().split(' ');
-            let include_libs = linker_args
-                .filter(|v| v.starts_with("-l"))
-                .map(|flag| &flag[2..]);
+                    if line.starts_with("EXTRALIBS") {
+                        Some(
+                            line.split('=')
+                                .last()
+                                .unwrap()
+                                .split(' ')
+                                .map(|s| s.to_string())
+                                .collect::<Vec<_>>(),
+                        )
+                    } else {
+                        None
+                    }
+                })
+                .flatten()
+                .collect::<Vec<_>>();
 
-            for lib in include_libs {
-                println!("cargo:rustc-link-lib={}", lib);
-            }
+            extra_linker_args
+                .iter()
+                .filter(|flag| flag.starts_with("-l"))
+                .map(|lib| &lib[2..])
+                .for_each(|lib| println!("cargo:rustc-link-lib={}", lib));
+
+            extra_linker_args
+                .iter()
+                .filter(|v| v.starts_with("-L"))
+                .map(|flag| {
+                    let path = &flag[2..];
+                    if path.starts_with('/') {
+                        PathBuf::from(path)
+                    } else {
+                        source().join(path)
+                    }
+                })
+                .for_each(|lib_search_path| {
+                    println!(
+                        "cargo:rustc-link-search=native={}",
+                        lib_search_path.to_str().unwrap()
+                    );
+                })
         }
 
         vec![search().join("include")]
