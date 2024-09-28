@@ -1,6 +1,6 @@
 [package]
 name    = "ffmpeg-sys-next"
-version = "7.0.3"
+version = "7.1.0"
 build   = "build.rs"
 links   = "ffmpeg"
 
@@ -20,9 +20,9 @@ libc = "0.2"
 
 [build-dependencies]
 num_cpus   = "1.16"
-cc         = "1.0"
+cc         = "1.1"
 pkg-config = "0.3"
-bindgen    = { version = "0.69", default-features = false, features = ["runtime"] }
+bindgen    = { version = "0.70", default-features = false, features = ["runtime"] }
 
 [target.'cfg(target_env = "msvc")'.build-dependencies]
 vcpkg = "0.2"
