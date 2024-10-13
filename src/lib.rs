@@ -12,6 +12,29 @@
 
 extern crate libc;
 
+#[cfg(feature = "vulkan")]
+extern crate ash;
+
+#[cfg(feature = "vulkan")]
+use ash::vk::{
+    Device as VkDevice, Format as VkFormat, Image as VkImage,
+    ImageCreateFlags as VkImageCreateFlags, ImageTiling as VkImageTiling,
+    ImageUsageFlags as VkImageUsageFlagBits, Instance as VkInstance, PFN_vkGetInstanceProcAddr,
+    PhysicalDevice as VkPhysicalDevice,
+    DeviceMemory as VkDeviceMemory,
+    MemoryPropertyFlags as VkMemoryPropertyFlagBits,
+    AccessFlags as VkAccessFlagBits,
+    ImageLayout as VkImageLayout,
+    Semaphore as VkSemaphore,
+    QueueFlags as VkQueueFlagBits,
+    VideoCodecOperationFlagsKHR as VkVideoCodecOperationFlagBitsKHR
+};
+
+#[cfg(feature = "vulkan")]
+type VkAllocationCallbacks = ash::vk::AllocationCallbacks<'static>; // hack!
+#[cfg(feature = "vulkan")]
+type VkPhysicalDeviceFeatures2 = ash::vk::PhysicalDeviceFeatures2<'static>; // hack!
+
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
 #[macro_use]

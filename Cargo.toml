@@ -17,6 +17,7 @@ doctest = false
 
 [dependencies]
 libc = "0.2"
+ash = { version = "0.38.0", optional = true}
 
 [build-dependencies]
 num_cpus   = "1.17"
@@ -121,3 +122,4 @@ avresample = []
 postproc   = []
 swresample = []
 swscale    = []
+vulkan     = ["ash"]
