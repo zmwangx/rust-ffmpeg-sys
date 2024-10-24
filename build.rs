@@ -7,7 +7,7 @@ use std::env;
 use std::fmt::Write as FmtWrite;
 use std::fs::{self, File};
 use std::io::{self, BufRead, BufReader, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::str;
 
@@ -195,7 +195,43 @@ fn get_ffmpet_target_os() -> String {
     }
 }
 
-fn build() -> io::Result<()> {
+/// Find the sysroot required for a cross compilation by ffmpeg **and** bindgen
+/// @see https://github.com/rust-lang/rust-bindgen/issues/1229
+fn find_sysroot() -> Option<String> {
+    if env::var("CARGO_FEATURE_BUILD").is_err() || env::var("HOST") == env::var("TARGET") {
+        return None;
+    }
+
+    if let Ok(sysroot) = env::var("SYSROOT") {
+        return Some(sysroot.to_string());
+    }
+
+    if env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("ios") {
+        let xcode_output = Command::new("xcrun")
+            .args(["--sdk", "iphoneos", "--show-sdk-path"])
+            .output()
+            .expect("failed to run xcrun");
+
+        if !xcode_output.status.success() {
+            panic!("Failed to run xcrun to get the ios sysroot, please install xcode tools or provide sysroot using $SYSROOT env. Error: {}", String::from_utf8_lossy(&xcode_output.stderr));
+        }
+
+        let string = String::from_utf8(xcode_output.stdout)
+            .expect("Failed to parse xcrun output")
+            .replace("\n", "");
+
+        if !Path::new(&string).exists() {
+            panic!("xcrun returned invalid sysroot path: {}", string);
+        }
+
+        return Some(string);
+    }
+
+    println!("cargo:warnning=Detected cross compilation but sysroot not provided");
+    None
+}
+
+fn build(sysroot: Option<&str>) -> io::Result<()> {
     let source_dir = source();
 
     // Command's path is not relative to command's current_dir
@@ -233,7 +269,27 @@ fn build() -> io::Result<()> {
             "--arch={}",
             env::var("CARGO_CFG_TARGET_ARCH").unwrap()
         ));
-        configure.arg(format!("--target_os={}", get_ffmpet_target_os()));
+        configure.arg(format!("--target-os={}", get_ffmpet_target_os()));
+    }
+
+    // for ios it is required to provide sysroot for both configure and bindgen
+    // for macos the easiest way is to run xcrun, for other platform we support $SYSROOT var
+    if env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("ios") {
+        let sysroot = sysroot.expect("The sysroot is required for ios cross compilation, make sure to have available xcode or provide the $SYSROOT env var");
+        configure.arg(format!("--sysroot={}", sysroot));
+
+        let cc = Command::new("xcrun")
+            .args(["--sdk", "iphoneos", "-f", "clang"])
+            .output()
+            .expect("failed to run xcrun")
+            .stdout;
+
+        configure.arg(format!(
+            "--cc={}",
+            str::from_utf8(&cc)
+                .expect("Failed to parse xcrun output")
+                .trim()
+        ));
     }
 
     // control debug build
@@ -347,6 +403,23 @@ fn build() -> io::Result<()> {
     enable!(configure, "BUILD_LIB_X265", "libx265");
     enable!(configure, "BUILD_LIB_AVS", "libavs");
     enable!(configure, "BUILD_LIB_XVID", "libxvid");
+
+    if env::var("CARGO_FEATURE_BUILD_VIDEOTOOLBOX").is_ok() {
+        configure.arg("--enable-videotoolbox");
+
+        if target != host && env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("ios") {
+            configure.arg("--extra-cflags=-mios-version-min=11.0");
+        }
+
+        if target != host && env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("macos") {
+            configure.arg("--extra-cflags=-mmacosx-version-min=10.11");
+        }
+    }
+
+    if env::var("CARGO_FEATURE_BUILD_AUDIOTOOLBOX").is_ok() {
+        configure.arg("--enable-audiotoolbox");
+        configure.arg("--extra-cflags=-mios-version-min=11.0");
+    }
 
     // other external libraries
     enable!(configure, "BUILD_LIB_DRM", "libdrm");
@@ -671,6 +744,7 @@ fn main() {
     let statik = env::var("CARGO_FEATURE_STATIC").is_ok();
     let ffmpeg_major_version: u32 = env!("CARGO_PKG_VERSION_MAJOR").parse().unwrap();
 
+    let sysroot = find_sysroot();
     let include_paths: Vec<PathBuf> = if env::var("CARGO_FEATURE_BUILD").is_ok() {
         println!(
             "cargo:rustc-link-search=native={}",
@@ -680,7 +754,7 @@ fn main() {
         if fs::metadata(search().join("lib").join("libavutil.a")).is_err() {
             fs::create_dir_all(output()).expect("failed to create build directory");
             fetch().unwrap();
-            build().unwrap();
+            build(sysroot.as_deref()).unwrap();
         }
 
         // Check additional required libraries.
@@ -696,7 +770,7 @@ fn main() {
                     if line.starts_with("EXTRALIBS") {
                         Some(
                             line.split('=')
-                                .last()
+                                .next_back()
                                 .unwrap()
                                 .split(' ')
                                 .map(|s| s.to_string())
@@ -1252,6 +1326,10 @@ fn main() {
         .derive_eq(true)
         .size_t_is_usize(true)
         .parse_callbacks(Box::new(Callbacks));
+
+    if let Some(sysroot) = sysroot.as_deref() {
+        builder = builder.clang_arg(format!("--sysroot={}", sysroot));
+    }
 
     // The input headers we would like to generate
     // bindings for.
