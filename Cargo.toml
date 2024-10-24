@@ -96,6 +96,16 @@ build-lib-x265             = ["build"]
 build-lib-avs              = ["build"]
 build-lib-xvid             = ["build"]
 
+build-hardcoded-tables     = ["build"]
+
+# hardware accelleration
+build-nvidia-hwacc =  ["build"]
+build-videotoolbox =  ["build"]
+build-audiotoolbox =  ["build"]
+buid-vaapi =          ["build"]
+build-opencl =        ["build"]
+build-vulkan =        ["build"]
+
 # protocols
 build-lib-smbclient = ["build"]
 build-lib-ssh       = ["build"]
