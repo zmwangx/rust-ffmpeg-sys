@@ -236,6 +236,23 @@ fn build() -> io::Result<()> {
         configure.arg(format!("--target_os={}", get_ffmpet_target_os()));
     }
 
+    // for ios specific hardware acceleration ffmpeg needs to find the frameworks
+    // and link against them using -framework
+    if env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("ios") {
+        let output = Command::new("xcrun")
+            .args(["--sdk", "iphoneos", "--show-sdk-path"])
+            .output()
+            .expect("failed to run xcrun")
+            .stdout;
+
+        configure.arg(format!(
+            "--sysroot={}",
+            str::from_utf8(&output)
+                .expect("Failed to parse xcrun output")
+                .trim()
+        ));
+    }
+
     // control debug build
     if env::var("DEBUG").is_ok() {
         configure.arg("--enable-debug");
@@ -348,6 +365,36 @@ fn build() -> io::Result<()> {
     enable!(configure, "BUILD_LIB_AVS", "libavs");
     enable!(configure, "BUILD_LIB_XVID", "libxvid");
 
+    // hardware accelleration
+    enable!(configure, "BUILD_VAAPI", "vaapi");
+    enable!(configure, "BUILD_VULKAN", "vdpau");
+    enable!(configure, "BUILD_OPENCL", "vaapi");
+
+    if env::var("CARGO_FEATURE_BUILD_VIDEOTOOLBOX").is_ok() {
+        configure.arg("--enable-videotoolbox");
+
+        if target != host && env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("ios") {
+            configure.arg("--extra-cflags=-mios-version-min=11.0");
+        }
+
+        if target != host && env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("macos") {
+            configure.arg("--extra-cflags=-mmacosx-version-min=10.11");
+        }
+    }
+
+    if env::var("CARGO_FEATURE_BUILD_AUDIOTOOLBOX").is_ok() {
+        configure.arg("--enable-audiotoolbox");
+        configure.arg("--extra-cflags=-mios-version-min=11.0");
+    }
+
+    if env::var("CARGO_FEATURE_BUILD_NVIDIA_HWACC").is_ok() {
+        configure.arg("--enable-cuda-nvcc");
+        configure.arg("--enable-cuvid");
+        configure.arg("--enable-nvenc");
+        configure.arg("--enable-nvdec");
+        configure.arg("--enable-libnpp");
+    }
+
     // other external libraries
     enable!(configure, "BUILD_LIB_DRM", "libdrm");
     enable!(configure, "BUILD_NVENC", "nvenc");
@@ -358,6 +405,8 @@ fn build() -> io::Result<()> {
 
     // configure misc build options
     enable!(configure, "BUILD_PIC", "pic");
+
+    println!("{configure:#?}");
 
     // run ./configure
     let output = configure
