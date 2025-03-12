@@ -163,6 +163,11 @@ fn fetch() -> io::Result<()> {
     let _ = std::fs::remove_dir_all(output_base_path.join(&clone_dest_dir));
     let status = Command::new("git")
         .current_dir(&output_base_path)
+        .args(if cfg!(target_os = "windows") {
+            vec!["-c", "core.autocrlf=false"]
+        } else {
+            vec![]
+        })
         .arg("clone")
         .arg("--depth=1")
         .arg("-b")
@@ -243,11 +248,71 @@ fn find_sysroot() -> Option<String> {
 
 fn build(sysroot: Option<&str>) -> io::Result<()> {
     let source_dir = source();
+    #[cfg(target_os = "windows")]
+    {
+        let path = env::var("PATH").unwrap_or_default();
+        let mut paths = env::split_paths(&path).collect::<Vec<_>>();
+        paths.push(source_dir.clone());
+        let new_path = env::join_paths(paths).unwrap();
+
+        let include = env::var("INCLUDE").unwrap_or_default();
+        let mut includes = env::split_paths(&include).collect::<Vec<_>>();
+        includes.push(source_dir.clone());
+        let new_include = env::join_paths(includes).unwrap();
+
+        env::set_var("PATH", &new_path);
+        env::set_var("INCLUDE", &new_include);
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        // Essential dynamic libraries for FFmpeg
+        println!("cargo:rustc-link-lib=dylib=ole32");
+        println!("cargo:rustc-link-lib=dylib=oleaut32");
+        println!("cargo:rustc-link-lib=dylib=gdi32");
+        println!("cargo:rustc-link-lib=dylib=user32");
+        println!("cargo:rustc-link-lib=dylib=vfw32");
+        println!("cargo:rustc-link-lib=dylib=strmiids");
+        println!("cargo:rustc-link-lib=dylib=bcrypt");
+        println!("cargo:rustc-link-lib=dylib=shlwapi");
+        println!("cargo:rustc-link-lib=dylib=shell32");
+    }
 
     // Command's path is not relative to command's current_dir
     let configure_path = source_dir.join("configure");
     assert!(configure_path.exists());
-    let mut configure = Command::new(&configure_path);
+    let mut configure;
+    #[cfg(not(target_os = "windows"))]
+    {
+        configure = Command::new(&configure_path);
+    }
+    // Check if sh exists
+    #[cfg(target_os = "windows")]
+    {
+        let sh_check = Command::new("sh").arg("-c").arg("echo ok").output();
+        match sh_check {
+            Ok(output) if output.status.success() => {
+                // sh exists and works
+            }
+            _ => {
+                return Err(io::Error::new(
+                    io::ErrorKind::Other,
+                    "Failed to find 'sh.exe', which is required for building FFmpeg",
+                ));
+            }
+        }
+
+        configure = Command::new("sh");
+        configure.arg(configure_path);
+        if env::var("CARGO_CFG_TARGET_ENV").unwrap_or_default() == "msvc" {
+            configure.arg("--toolchain=msvc");
+        }
+
+        // if env::var("CARGO_CFG_TARGET_ARCH").unwrap_or_default() == "x86_64" {
+        //     configure.arg("--arch=x86_64");
+        //     configure.arg("--target-os=win64");
+        // }
+    }
     configure.current_dir(&source_dir);
 
     configure.arg(format!("--prefix={}", search().to_string_lossy()));
@@ -368,7 +433,10 @@ fn build(sysroot: Option<&str>) -> io::Result<()> {
     // make it static
     configure.arg("--enable-static");
     configure.arg("--disable-shared");
-    configure.arg("--enable-pthreads");
+    #[cfg(not(target_os = "windows"))]
+    {
+        configure.arg("--enable-pthreads");
+    }
 
     // position independent code
     configure.arg("--enable-pic");
