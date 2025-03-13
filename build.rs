@@ -264,7 +264,7 @@ fn build(sysroot: Option<&str>) -> io::Result<()> {
         env::set_var("INCLUDE", &new_include);
     }
 
-    #[cfg(target_os = "windows")]
+    #[cfg(all(target_os = "windows", target_env = "msvc"))]
     {
         // Essential dynamic libraries for FFmpeg
         println!("cargo:rustc-link-lib=dylib=ole32");
@@ -304,14 +304,9 @@ fn build(sysroot: Option<&str>) -> io::Result<()> {
 
         configure = Command::new("sh");
         configure.arg(configure_path);
-        if env::var("CARGO_CFG_TARGET_ENV").unwrap_or_default() == "msvc" {
+        if cfg!(target_env = "msvc") {
             configure.arg("--toolchain=msvc");
         }
-
-        // if env::var("CARGO_CFG_TARGET_ARCH").unwrap_or_default() == "x86_64" {
-        //     configure.arg("--arch=x86_64");
-        //     configure.arg("--target-os=win64");
-        // }
     }
     configure.current_dir(&source_dir);
 
@@ -433,7 +428,7 @@ fn build(sysroot: Option<&str>) -> io::Result<()> {
     // make it static
     configure.arg("--enable-static");
     configure.arg("--disable-shared");
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(not(target_env = "msvc"))]
     {
         configure.arg("--enable-pthreads");
     }
