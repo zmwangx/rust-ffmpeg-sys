@@ -29,3 +29,73 @@ In addition to feature flags declared in `Cargo.toml`, this crate performs vario
 - `ff_api_<feature>`, e.g. `ff_api_vaapi`, corresponding to whether their respective uppercase deprecation guards evaluate to true.
 
 - `ff_api_<feature>_is_defined`, e.g. `ff_api_vappi_is_defined`, similar to above except these are enabled as long as the corresponding deprecation guards are defined.
+
+# Troubleshooting rust-ffmpeg-sys Build Error:
+
+## Error Description
+
+When compiling a Rust project that depends on `ffmpeg-sys-next`, you encounter:
+
+```text
+error: failed to run custom build command for `ffmpeg-sys-next`
+
+--- stderr
+thread 'main' panicked at build.rs:795:14:
+called `Result::unwrap()` on an `Err` value:
+pkg-config exited with status code 1
+> PKG_CONFIG_ALLOW_SYSTEM_LIBS=1 pkg-config --libs --cflags libavutil
+
+The system library `libavutil` required by crate `ffmpeg-sys-next` was not found.
+```
+
+### Causes:
+
+1. **FFmpeg Not Installed**: The Rust crate `ffmpeg-sys-next` requires FFmpeg’s development files (headers and libraries).
+2. **Missing `.pc` Files**: `pkg-config` (a tool to locate libraries) cannot find `libavutil.pc`, which describes how to link to FFmpeg.
+3. **Environment Variables Not Configured**: `PKG_CONFIG_PATH` or `VCPKG_ROOT` is not set, so the build system cannot locate FFmpeg.
+
+---
+
+## Install FFmpeg via `vcpkg` (Recommended for Windows)
+
+### Step 1: Install `vcpkg`
+
+1. Clone the `vcpkg` repository:
+   ```powershell
+   git clone https://github.com/Microsoft/vcpkg.git
+   cd vcpkg
+   ```
+2. Bootstrap `vcpkg`:
+   ```powershell
+   .\bootstrap-vcpkg.bat
+   ```
+
+### Step 2: Install FFmpeg Libraries
+
+Install FFmpeg for static linking (64-bit Windows):
+
+```powershell
+.\vcpkg install ffmpeg:x64-windows-static
+```
+
+### Step 3: Integrate `vcpkg` with Your System
+
+```powershell
+.\vcpkg integrate install
+```
+
+This configures your system to automatically find libraries installed via `vcpkg`.
+
+### Step 4: Set Environment Variables
+
+1. Set `VCPKG_ROOT` to your `vcpkg` directory (replace `C:\vcpkg` with your actual path):
+   ```powershell
+   [System.Environment]::SetEnvironmentVariable('VCPKG_ROOT', 'C:\vcpkg', 'User')
+   ```
+2. Restart your terminal/PowerShell to apply changes.
+
+### Step 5: Rebuild Your Project
+
+```powershell
+cargo clean && cargo build
+```
