@@ -28,7 +28,7 @@ jobs:
           ]
       fail-fast: false
     env:
-      FEATURES: avcodec,avdevice,avfilter,avformat,postproc,swresample,swscale
+      FEATURES: avcodec,avdevice,avfilter,avformat,postproc,swresample,swscale,vulkan
     steps:
       - uses: actions/checkout@v2
       - name: Install dependencies
@@ -62,7 +62,7 @@ jobs:
     strategy:
       fail-fast: false
     env:
-      FEATURES: avcodec,avdevice,avfilter,avformat,swresample,swscale #,postproc
+      FEATURES: avcodec,avdevice,avfilter,avformat,swresample,swscale,vulkan #,postproc
       FFMPEG_DIR: /home/runner/work/rust-ffmpeg-sys/rust-ffmpeg-sys/ffmpeg-7.1-linux-clang-default
     steps:
       - uses: actions/checkout@v2
