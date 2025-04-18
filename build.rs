@@ -187,7 +187,7 @@ fn switch(configure: &mut Command, feature: &str, name: &str) {
     configure.arg(arg.to_string() + name);
 }
 
-fn get_ffmpet_target_os() -> String {
+fn get_ffmpeg_target_os() -> String {
     let cargo_target_os = env::var("CARGO_CFG_TARGET_OS").unwrap();
     match cargo_target_os.as_str() {
         "ios" => "darwin".to_string(),
@@ -227,7 +227,21 @@ fn find_sysroot() -> Option<String> {
         return Some(string);
     }
 
-    println!("cargo:warnning=Detected cross compilation but sysroot not provided");
+    if env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("android") {
+        let toolchain_root = env::var("ANDROID_TOOLCHAIN_ROOT").expect("For android cross compilation please provide the NDK llvm toolchain path using $ANDROID_TOOLCHAIN_ROOT env var and optionally platform version using $ANDROID_PLATFORM env var");
+        let sysroot = Path::new(&toolchain_root).join("sysroot");
+
+        if !sysroot.exists() {
+            panic!(
+                "Android sysroot path does not exists: {}",
+                sysroot.display()
+            );
+        }
+
+        return Some(sysroot.to_string_lossy().to_string());
+    }
+
+    println!("cargo:warning=Detected cross compilation but sysroot not provided");
     None
 }
 
@@ -259,17 +273,24 @@ fn build(sysroot: Option<&str>) -> io::Result<()> {
             configure.arg(format!("--extra-ldflags={}", target_flag));
         }
 
-        let compiler = cc.get_compiler();
-        let compiler = compiler.path().file_stem().unwrap().to_str().unwrap();
-        if let Some(suffix_pos) = compiler.rfind('-') {
-            let prefix = compiler[0..suffix_pos].trim_end_matches("-wr"); // "wr-c++" compiler
-            configure.arg(format!("--cross-prefix={}-", prefix));
-        }
         configure.arg(format!(
             "--arch={}",
             env::var("CARGO_CFG_TARGET_ARCH").unwrap()
         ));
-        configure.arg(format!("--target-os={}", get_ffmpet_target_os()));
+        configure.arg(format!("--target-os={}", get_ffmpeg_target_os()));
+
+        // cross-prefix won't work for android because they use different compiler for every
+        // platform version, so we provide direct compiler paths manually instead
+        if env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("android") {
+            let compiler = cc.get_compiler();
+            let compiler = compiler.path().file_stem().unwrap().to_str().unwrap();
+
+            if let Some(suffix_pos) = compiler.rfind('-') {
+                let prefix = compiler[0..suffix_pos].trim_end_matches("-wr"); // "wr-c++" compiler
+
+                configure.arg(format!("--cross-prefix={}-", prefix));
+            }
+        }
     }
 
     // for ios it is required to provide sysroot for both configure and bindgen
@@ -290,6 +311,22 @@ fn build(sysroot: Option<&str>) -> io::Result<()> {
                 .expect("Failed to parse xcrun output")
                 .trim()
         ));
+    }
+
+    if env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("android") {
+        let toolchain_root = env::var("ANDROID_TOOLCHAIN_ROOT").expect("For android cross compilation please provide the NDK llvm toolchain path using $ANDROID_TOOLCHAIN_ROOT env var and optionally platform version using $ANDROID_PLATFORM env var");
+        let android_platform = env::var("ANDROID_PLATFORM").unwrap_or(String::from("24")); // default version as of 2025
+        let target_arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap();
+
+        configure.arg(format!(
+            "--cc={toolchain_root}/bin/{target_arch}-linux-android{android_platform}-clang",
+        ));
+        configure.arg(format!(
+            "--cxx={toolchain_root}/bin/{target_arch}-linux-android{android_platform}-clang++",
+        ));
+
+        // required for android
+        configure.arg("--extra-cflags=-fPIC");
     }
 
     // control debug build
@@ -432,6 +469,7 @@ fn build(sysroot: Option<&str>) -> io::Result<()> {
     // configure misc build options
     enable!(configure, "BUILD_PIC", "pic");
 
+    // panic!("{:?}", configure);
     // run ./configure
     let output = configure
         .output()
@@ -895,7 +933,12 @@ fn main() {
             .include_paths
     };
 
-    if statik && cfg!(target_os = "macos") {
+    if statik
+        && matches!(
+            env::var("CARGO_CFG_TARGET_OS").as_deref(),
+            Ok("macos") | Ok("ios")
+        )
+    {
         let frameworks = vec![
             "AppKit",
             "AudioToolbox",
