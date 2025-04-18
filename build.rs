@@ -187,7 +187,7 @@ fn switch(configure: &mut Command, feature: &str, name: &str) {
     configure.arg(arg.to_string() + name);
 }
 
-fn get_ffmpet_target_os() -> String {
+fn get_ffmpeg_target_os() -> String {
     let cargo_target_os = env::var("CARGO_CFG_TARGET_OS").unwrap();
     match cargo_target_os.as_str() {
         "ios" => "darwin".to_string(),
@@ -227,7 +227,17 @@ fn find_sysroot() -> Option<String> {
         return Some(string);
     }
 
-    println!("cargo:warnning=Detected cross compilation but sysroot not provided");
+    if env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("android") {
+        let sysroot_path = env::var("CARGO_NDK_SYSROOT_PATH").expect("Missing android sysroot path. For android cross compilation please use cargo-ndk which exposes all the required NDK paths throught env variables.");
+
+        if !Path::new(&sysroot_path).exists() {
+            panic!("Android sysroot path does not exists: {}", sysroot_path);
+        }
+
+        return Some(sysroot_path);
+    }
+
+    println!("cargo:warning=Detected cross compilation but sysroot not provided");
     None
 }
 
@@ -259,17 +269,24 @@ fn build(sysroot: Option<&str>) -> io::Result<()> {
             configure.arg(format!("--extra-ldflags={}", target_flag));
         }
 
-        let compiler = cc.get_compiler();
-        let compiler = compiler.path().file_stem().unwrap().to_str().unwrap();
-        if let Some(suffix_pos) = compiler.rfind('-') {
-            let prefix = compiler[0..suffix_pos].trim_end_matches("-wr"); // "wr-c++" compiler
-            configure.arg(format!("--cross-prefix={}-", prefix));
-        }
         configure.arg(format!(
             "--arch={}",
             env::var("CARGO_CFG_TARGET_ARCH").unwrap()
         ));
-        configure.arg(format!("--target-os={}", get_ffmpet_target_os()));
+        configure.arg(format!("--target-os={}", get_ffmpeg_target_os()));
+
+        // cross-prefix won't work for android because they use different compiler for every
+        // platform version, so we provide direct compiler paths manually instead
+        if env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("android") {
+            let compiler = cc.get_compiler();
+            let compiler = compiler.path().file_stem().unwrap().to_str().unwrap();
+
+            if let Some(suffix_pos) = compiler.rfind('-') {
+                let prefix = compiler[0..suffix_pos].trim_end_matches("-wr"); // "wr-c++" compiler
+
+                configure.arg(format!("--cross-prefix={}-", prefix));
+            }
+        }
     }
 
     // for ios it is required to provide sysroot for both configure and bindgen
@@ -290,6 +307,47 @@ fn build(sysroot: Option<&str>) -> io::Result<()> {
                 .expect("Failed to parse xcrun output")
                 .trim()
         ));
+    }
+
+    if env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("android") {
+        // cargo ndk auto populates rust env variables for android cross compilation
+        // so we can just leverage the same compiler path and cflags for ffmpeg build
+        let android_cc_raw_path = env::var(format!("CC_{}", target)).expect("Missing CC path for android. Make sure to use cargo-ndk for adnrdoic cross compilation");
+        let android_cc_path = Path::new(&android_cc_raw_path);
+        if !android_cc_path.exists() {
+            panic!("Android CC path does not exists: {}", android_cc_raw_path);
+        }
+        configure.arg(format!("--cc={android_cc_raw_path}"));
+
+        for tool in ["nm", "strip"] {
+            configure.arg(format!(
+                "--{tool}={}",
+                android_cc_path
+                    .join("..")
+                    .join(format!("llvm-{tool}"))
+                    .canonicalize()
+                    .unwrap_or_else(|_| panic!("failed to resolve a path to android {}", tool))
+                    .display()
+            ));
+        }
+
+        if let Ok(android_target_flags) = env::var(format!("CFLAGS_{}", target)).as_deref() {
+            configure.arg(format!("--extra-cflags={android_target_flags}"));
+            configure.arg(format!("--extra-ldflags={android_target_flags}"));
+        }
+
+        if matches!(
+            env::var("CARGO_CFG_TARGET_ARCH").as_deref(),
+            Ok("x86_64") | Ok("x86")
+        ) {
+            // x86 asm contains position dependent code (relocations)
+            configure.arg("--disable-asm");
+        }
+
+        // https://github.com/Javernaut/ffmpeg-android-maker/blob/master/scripts/ffmpeg/build.sh#L30
+        // configure.arg(--extra-ldflags=-WL,-z,max-page-size=16384");
+        // required for android
+        configure.arg("--extra-cflags=-fPIC");
     }
 
     // control debug build
@@ -437,7 +495,14 @@ fn build(sysroot: Option<&str>) -> io::Result<()> {
         .output()
         .unwrap_or_else(|_| panic!("{:?} failed", configure));
     if !output.status.success() {
-        println!("configure: {}", String::from_utf8_lossy(&output.stdout));
+        println!(
+            "configure stdout: {}",
+            String::from_utf8_lossy(&output.stdout)
+        );
+        println!(
+            "configure stderr: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
 
         return Err(io::Error::new(
             io::ErrorKind::Other,
@@ -896,7 +961,12 @@ fn main() {
             .include_paths
     };
 
-    if statik && cfg!(target_os = "macos") {
+    if statik
+        && matches!(
+            env::var("CARGO_CFG_TARGET_OS").as_deref(),
+            Ok("macos") | Ok("ios")
+        )
+    {
         let frameworks = vec![
             "AppKit",
             "AudioToolbox",
