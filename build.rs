@@ -735,6 +735,7 @@ fn link_to_libraries(statik: bool) {
             println!("cargo:rustc-link-lib={}={}", ffmpeg_ty, lib.name);
         }
     }
+    println!("cargo:rustc-link-arg=-Wl,--no-as-needed");
     if env::var("CARGO_FEATURE_BUILD_ZLIB").is_ok() && cfg!(target_os = "linux") {
         println!("cargo:rustc-link-lib=z");
     }
