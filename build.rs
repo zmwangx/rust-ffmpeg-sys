@@ -287,6 +287,9 @@ fn build(sysroot: Option<&str>) -> io::Result<()> {
                 configure.arg(format!("--cross-prefix={}-", prefix));
             }
         }
+    } else {
+        // tune the compiler for the host arhitecture
+        configure.arg("--extra-cflags=-march=native -mtune=native");
     }
 
     // for ios it is required to provide sysroot for both configure and bindgen
@@ -357,6 +360,9 @@ fn build(sysroot: Option<&str>) -> io::Result<()> {
     } else {
         configure.arg("--disable-debug");
         configure.arg("--enable-stripping");
+        configure.arg("--extra-cflags=-03 -ffast-math -funroll-loops");
+        #[cfg(not(target_os = "windows"))]
+        configure.arg("--extra-ldflags=-flto");
     }
 
     // make it static
