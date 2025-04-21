@@ -364,6 +364,7 @@ fn build(sysroot: Option<&str>) -> io::Result<()> {
     configure.arg("--disable-shared");
     configure.arg("--enable-pthreads");
 
+    // position independent code
     configure.arg("--enable-pic");
 
     // stop autodetected libraries enabling themselves, causing linking errors
@@ -371,6 +372,9 @@ fn build(sysroot: Option<&str>) -> io::Result<()> {
 
     // do not build programs since we don't need them
     configure.arg("--disable-programs");
+
+    // do not generate documentation
+    configure.arg("--disable-doc");
 
     macro_rules! enable {
         ($conf:expr, $feat:expr, $name:expr) => {
