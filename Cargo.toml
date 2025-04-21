@@ -97,8 +97,16 @@ build-lib-avs              = ["build"]
 build-lib-xvid             = ["build"]
 
 # hardware accelleration
-build-videotoolbox =  ["build"]
-build-audiotoolbox =  ["build"]
+build-videotoolbox = ["build"]
+build-audiotoolbox = ["build"]
+build-vaapi	       = ["build"]
+build-lib-d3d11va  = ["build"]
+build-lib-dxva2    = ["build"]
+build-nvidia       = ["build"]
+build-lib-libmfx   = ["build"]
+build-mediacodec   = ["build"]
+build-amf          = ["build"]
+build-vulkan       = ["build"]
 
 # protocols
 build-lib-smbclient = ["build"]

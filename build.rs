@@ -472,7 +472,15 @@ fn build(sysroot: Option<&str>) -> io::Result<()> {
     enable!(configure, "BUILD_LIB_AVS", "libavs");
     enable!(configure, "BUILD_LIB_XVID", "libxvid");
 
-    if env::var("CARGO_FEATURE_BUILD_VIDEOTOOLBOX").is_ok() {
+    // make sure to only enable related hw acceleration features for a correct
+    // target os. This allows to leave allows cargo features enable and control
+    // ffmpeg compilation using target only
+    let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap();
+
+    // Apple VideoToolbox (iOS and macOS)
+    if env::var("CARGO_FEATURE_BUILD_VIDEOTOOLBOX").is_ok()
+        && matches!(target_os.as_str(), "ios" | "macos")
+    {
         configure.arg("--enable-videotoolbox");
 
         if target != host && env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("ios") {
@@ -484,10 +492,88 @@ fn build(sysroot: Option<&str>) -> io::Result<()> {
         }
     }
 
-    if env::var("CARGO_FEATURE_BUILD_AUDIOTOOLBOX").is_ok() {
+    // Apple audio hw acceleration API (iOS and macOS)
+    if env::var("CARGO_FEATURE_BUILD_AUDIOTOOLBOX").is_ok()
+        && matches!(target_os.as_str(), "ios" | "macos")
+    {
         configure.arg("--enable-audiotoolbox");
         configure.arg("--extra-cflags=-mios-version-min=11.0");
     }
+
+    // Linux video acceleration API (VAAPI)
+    if env::var("CARGO_FEATURE_BUILD_VAAPI").is_ok() && matches!(target_os.as_str(), "linux") {
+        configure.arg("--enable-vaapi");
+    }
+
+    if env::var("CARGO_FEATURE_BUILD_LIB_D3D11VA").is_ok()
+        && matches!(target_os.as_str(), "windows")
+    {
+        configure.arg("--enable-d3d11va");
+    }
+
+    // DirectX Video Acceleration 2 (Windows only)
+    if env::var("CARGO_FEATURE_BUILD_LIB_DXVA2").is_ok() && matches!(target_os.as_str(), "windows")
+    {
+        configure.arg("--enable-dxva2");
+    }
+
+    // NVIDIA NVENC/NVDEC acceleration (Linux and Windows)
+    if env::var("CARGO_FEATURE_BUILD_NVIDIA").is_ok()
+        && matches!(target_os.as_str(), "linux" | "windows")
+    {
+        configure.arg("--enable-libnpp");
+        configure.arg("--enable-cuda-nvcc");
+        configure.arg("--enable-cuvid");
+        configure.arg("--enable-nvenc");
+        configure.arg("--enable-cuda-llvm");
+
+        let cuda_path = env::var("CUDA_PATH").unwrap_or(if target_os == "linux" {
+            "/usr/local/cuda".to_string()
+        } else {
+            "C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA".to_string()
+        });
+        println!("cargo:rustc-link-arg=-L{cuda_path}/lib64");
+        println!("cargo:rustc-link-arg=-I{cuda_path}/include");
+
+        // Additional configuration may be needed for CUDA toolkit path
+        // This could be provided as an environment variable
+        if let Ok(cuda_path) = env::var("CUDA_PATH") {
+            configure.arg(format!("--cuda-path={}", cuda_path));
+        }
+    }
+
+    // Intel Quick Sync Video (Linux and Windows)
+    if env::var("CARGO_FEATURE_BUILD_LIB_LIBMFX").is_ok()
+        && matches!(target_os.as_str(), "linux" | "windows")
+    {
+        configure.arg("--enable-libmfx");
+    }
+
+    // Android MediaCodec (Android only)
+    if env::var("CARGO_FEATURE_BUILD_MEDIACODEC").is_ok() && target_os == "android" {
+        configure.arg("--enable-mediacodec");
+        configure.arg("--enable-jni");
+
+        // Add common MediaCodec decoders
+        configure.arg("--enable-decoder=h264_mediacodec");
+        configure.arg("--enable-decoder=hevc_mediacodec");
+        configure.arg("--enable-decoder=vp8_mediacodec");
+        configure.arg("--enable-decoder=vp9_mediacodec");
+        configure.arg("--enable-decoder=av1_mediacodec");
+    }
+
+    // AMD Advanced Media Framework (Linux and Windows)
+    if env::var("CARGO_FEATURE_BUILD_AMF").is_ok()
+        && matches!(target_os.as_str(), "linux" | "windows")
+        && matches!(
+            env::var("CARGO_FEATURE_TARGET_ARCH").as_deref(),
+            Ok("x86_64")
+        )
+    {
+        configure.arg("--enable-amf");
+    }
+
+    enable!(configure, "BUILD_VULKAN", "vulkan");
 
     // other external libraries
     enable!(configure, "BUILD_LIB_DRM", "libdrm");

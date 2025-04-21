@@ -17,6 +17,7 @@ jobs:
           ["3.3", "3.4", "4.0", "4.1", "4.2", "4.3", "4.4", "5.0", "5.1", "6.0"]
       fail-fast: false
     env:
+      CARGO_PROFILE_DEV_BUILD_OVERRIDE_DEBUG: true
       FEATURES: avcodec,avdevice,avfilter,avformat,postproc,swresample,swscale
     steps:
       - uses: actions/checkout@v2
@@ -51,6 +52,7 @@ jobs:
       matrix:
         ffmpeg_version: ["6.1", "7.0", "7.1"]
     env:
+      CARGO_PROFILE_DEV_BUILD_OVERRIDE_DEBUG: true
       FEATURES: avcodec,avdevice,avfilter,avformat,swresample,swscale #,postproc
       FFMPEG_DIR: /home/runner/work/rust-ffmpeg-sys/rust-ffmpeg-sys/ffmpeg-${{ matrix.ffmpeg_version }}-linux-clang-default
     steps:
