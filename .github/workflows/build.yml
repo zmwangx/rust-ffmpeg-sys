@@ -50,7 +50,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        ffmpeg_version: ["6.1", "7.0", "7.1"]
+        ffmpeg_version: ["6.1", "7.0", "7.1", "8.0"]
     env:
       CARGO_PROFILE_DEV_BUILD_OVERRIDE_DEBUG: true
       FEATURES: avcodec,avdevice,avfilter,avformat,swresample,swscale #,postproc
@@ -84,7 +84,7 @@ jobs:
     name: Manually fetch, build, and link static ffmpeg
     runs-on: ubuntu-latest
     env:
-      FEATURES: build,static,build-lib-x264,build-license-gpl,avcodec,avdevice,avfilter,avformat,postproc,swresample,swscale
+      FEATURES: build,static,build-lib-x264,build-license-gpl,avcodec,avdevice,avfilter,avformat,swresample,swscale #,postproc
     steps:
       - uses: actions/checkout@v2
       - name: Set up Rust
