@@ -494,6 +494,10 @@ fn build(sysroot: Option<&str>) -> io::Result<()> {
     // configure misc build options
     enable!(configure, "BUILD_PIC", "pic");
 
+    // skip all the warnings from output as they can significantly slow down the build
+    // time on platforms like mac which spawns thousands of nullabilty complieance warnings
+    configure.arg("--extra-cflags=-w");
+
     // run ./configure
     let output = configure
         .output()
@@ -924,7 +928,7 @@ fn main() {
                 println!("cargo:rustc-link-lib=ws2_32");
             }
 
-            // avutil depdendencies
+            // avutil dependencies
             println!("cargo:rustc-link-lib=bcrypt");
             println!("cargo:rustc-link-lib=user32");
         }
