@@ -248,8 +248,7 @@ fn find_sysroot() -> Option<String> {
 
 fn build(sysroot: Option<&str>) -> io::Result<()> {
     let source_dir = source();
-    #[cfg(target_os = "windows")]
-    {
+    if cfg!(target_os = "windows") {
         let path = env::var("PATH").unwrap_or_default();
         let mut paths = env::split_paths(&path).collect::<Vec<_>>();
         paths.push(source_dir.clone());
@@ -264,52 +263,34 @@ fn build(sysroot: Option<&str>) -> io::Result<()> {
         env::set_var("INCLUDE", &new_include);
     }
 
-    #[cfg(all(target_os = "windows", target_env = "msvc"))]
-    {
-        // Essential dynamic libraries for FFmpeg
-        println!("cargo:rustc-link-lib=dylib=ole32");
-        println!("cargo:rustc-link-lib=dylib=oleaut32");
-        println!("cargo:rustc-link-lib=dylib=gdi32");
-        println!("cargo:rustc-link-lib=dylib=user32");
-        println!("cargo:rustc-link-lib=dylib=vfw32");
-        println!("cargo:rustc-link-lib=dylib=strmiids");
-        println!("cargo:rustc-link-lib=dylib=bcrypt");
-        println!("cargo:rustc-link-lib=dylib=shlwapi");
-        println!("cargo:rustc-link-lib=dylib=shell32");
-    }
-
     // Command's path is not relative to command's current_dir
     let configure_path = source_dir.join("configure");
     assert!(configure_path.exists());
-    let mut configure;
-    #[cfg(not(target_os = "windows"))]
-    {
-        configure = Command::new(&configure_path);
-    }
-    // Check if sh exists
-    #[cfg(target_os = "windows")]
-    {
-        let sh_check = Command::new("sh").arg("-c").arg("echo ok").output();
-        match sh_check {
-            Ok(output) if output.status.success() => {
-                // sh exists and works
-            }
-            _ => {
-                return Err(io::Error::new(
-                    io::ErrorKind::Other,
-                    "Failed to find 'sh.exe', which is required for building FFmpeg",
-                ));
-            }
+    let mut configure = if cfg!(target_os = "windows") {
+        if Command::new("sh")
+            .arg("-c")
+            .arg("echo ok")
+            .output()
+            .is_err()
+        {
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                "Failed to find 'sh.exe', which is required for building FFmpeg",
+            ));
         }
 
-        configure = Command::new("sh");
+        let mut configure = Command::new("sh");
         configure.arg(configure_path);
         if cfg!(target_env = "msvc") {
             configure.arg("--toolchain=msvc");
         }
-    }
-    configure.current_dir(&source_dir);
 
+        configure
+    } else {
+        Command::new(&configure_path)
+    };
+
+    configure.current_dir(&source_dir);
     configure.arg(format!("--prefix={}", search().to_string_lossy()));
 
     let target = env::var("TARGET").unwrap();
@@ -350,6 +331,19 @@ fn build(sysroot: Option<&str>) -> io::Result<()> {
     } else {
         // tune the compiler for the host arhitecture
         configure.arg("--extra-cflags=-march=native -mtune=native");
+    }
+
+    if env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows") {
+        // essential librareis on windowsw
+        println!("cargo:rustc-link-lib=dylib=ole32");
+        println!("cargo:rustc-link-lib=dylib=oleaut32");
+        println!("cargo:rustc-link-lib=dylib=gdi32");
+        println!("cargo:rustc-link-lib=dylib=user32");
+        println!("cargo:rustc-link-lib=dylib=vfw32");
+        println!("cargo:rustc-link-lib=dylib=strmiids");
+        println!("cargo:rustc-link-lib=dylib=bcrypt");
+        println!("cargo:rustc-link-lib=dylib=shlwapi");
+        println!("cargo:rustc-link-lib=dylib=shell32");
     }
 
     // for ios it is required to provide sysroot for both configure and bindgen
@@ -428,6 +422,7 @@ fn build(sysroot: Option<&str>) -> io::Result<()> {
     // make it static
     configure.arg("--enable-static");
     configure.arg("--disable-shared");
+    // windows includes threading in the standard library
     #[cfg(not(target_env = "msvc"))]
     {
         configure.arg("--enable-pthreads");
