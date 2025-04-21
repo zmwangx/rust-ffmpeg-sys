@@ -104,7 +104,7 @@ build-audiotoolbox =  ["build"]
 build-lib-smbclient = ["build"]
 build-lib-ssh       = ["build"]
 
-# components
+# components test
 avcodec    = []
 avdevice   = ["avformat"]
 avfilter   = []
