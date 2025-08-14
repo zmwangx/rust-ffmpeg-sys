@@ -179,7 +179,7 @@ fn fetch() -> io::Result<()> {
     if status.success() {
         Ok(())
     } else {
-        Err(io::Error::new(io::ErrorKind::Other, "fetch failed"))
+        Err(io::Error::other("fetch failed"))
     }
 }
 
@@ -273,8 +273,7 @@ fn build(sysroot: Option<&str>) -> io::Result<()> {
             .output()
             .is_err()
         {
-            return Err(io::Error::new(
-                io::ErrorKind::Other,
+            return Err(io::Error::other(
                 "Failed to find 'sh.exe', which is required for building FFmpeg",
             ));
         }
@@ -472,6 +471,7 @@ fn build(sysroot: Option<&str>) -> io::Result<()> {
         .iter()
         .filter(|lib| lib.is_feature)
         .filter(|lib| !(lib.name == "avresample" && ffmpeg_major_version >= 5))
+        .filter(|lib| !(lib.name == "postproc" && ffmpeg_major_version >= 8))
     {
         switch(&mut configure, &lib.name.to_uppercase(), lib.name);
     }
@@ -662,13 +662,10 @@ fn build(sysroot: Option<&str>) -> io::Result<()> {
             String::from_utf8_lossy(&output.stderr)
         );
 
-        return Err(io::Error::new(
-            io::ErrorKind::Other,
-            format!(
-                "configure failed {}",
-                String::from_utf8_lossy(&output.stderr)
-            ),
-        ));
+        return Err(io::Error::other(format!(
+            "configure failed {}",
+            String::from_utf8_lossy(&output.stderr)
+        )));
     }
 
     // run make
@@ -679,7 +676,7 @@ fn build(sysroot: Option<&str>) -> io::Result<()> {
         .status()?
         .success()
     {
-        return Err(io::Error::new(io::ErrorKind::Other, "make failed"));
+        return Err(io::Error::other("make failed"));
     }
 
     // run make install
@@ -689,7 +686,7 @@ fn build(sysroot: Option<&str>) -> io::Result<()> {
         .status()?
         .success()
     {
-        return Err(io::Error::new(io::ErrorKind::Other, "make install failed"));
+        return Err(io::Error::other("make install failed"));
     }
 
     Ok(())
@@ -756,7 +753,7 @@ fn check_features(
         );
     }
 
-    let version_check_info = [("avcodec", 56, 62, 0, 108)];
+    let version_check_info = [("avcodec", 56, 63, 0, 108)];
     for &(lib, begin_version_major, end_version_major, begin_version_minor, end_version_minor) in
         version_check_info.iter()
     {
@@ -909,6 +906,7 @@ fn check_features(
         ("ffmpeg_6_1", 60, 31),
         ("ffmpeg_7_0", 61, 3),
         ("ffmpeg_7_1", 61, 19),
+        ("ffmpeg_8_0", 62, 8),
     ];
     for &(ffmpeg_version_flag, lavc_version_major, lavc_version_minor) in
         ffmpeg_lavc_versions.iter()
@@ -922,6 +920,10 @@ fn check_features(
             .find(&search_str)
             .expect("Variable not found in output")
             + search_str.len();
+        println!(
+            r#"cargo:rustc-check-cfg=cfg(feature, values("{}"))"#,
+            ffmpeg_version_flag
+        );
         if &stdout[pos..pos + 1] == "1" {
             println!(r#"cargo:rustc-cfg=feature="{}""#, ffmpeg_version_flag);
             println!(r#"cargo:{}=true"#, ffmpeg_version_flag);
@@ -1566,11 +1568,14 @@ fn main() {
         builder = builder
             .header(search_include(&include_paths, "libavcodec/avcodec.h"))
             .header(search_include(&include_paths, "libavcodec/dv_profile.h"))
-            .header(search_include(&include_paths, "libavcodec/avfft.h"))
             .header(search_include(&include_paths, "libavcodec/vorbis_parser.h"));
 
         if ffmpeg_major_version < 5 {
-            builder = builder.header(search_include(&include_paths, "libavcodec/vaapi.h"))
+            builder = builder.header(search_include(&include_paths, "libavcodec/vaapi.h"));
+        }
+        let avfft_path = search_include(&include_paths, "libavcodec/avfft.h");
+        if std::path::Path::new(&avfft_path).exists() {
+            builder = builder.header(avfft_path);
         }
     }
 
@@ -1653,7 +1658,10 @@ fn main() {
         .header(search_include(&include_paths, "libavutil/xtea.h"));
 
     if env::var("CARGO_FEATURE_POSTPROC").is_ok() {
-        builder = builder.header(search_include(&include_paths, "libpostproc/postprocess.h"));
+        let postproc_path = search_include(&include_paths, "libpostproc/postprocess.h");
+        if std::path::Path::new(&postproc_path).exists() {
+            builder = builder.header(postproc_path);
+        }
     }
 
     if env::var("CARGO_FEATURE_SWRESAMPLE").is_ok() {

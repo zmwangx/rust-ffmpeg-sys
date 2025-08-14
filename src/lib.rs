@@ -6,6 +6,9 @@
 #![allow(clippy::redundant_static_lifetimes)]
 #![allow(clippy::too_many_arguments)]
 #![allow(clippy::type_complexity)]
+#![allow(clippy::ptr_offset_with_cast)]
+#![allow(unpredictable_function_pointer_comparisons)]
+#![allow(unnecessary_transmutes)]
 
 extern crate libc;
 
