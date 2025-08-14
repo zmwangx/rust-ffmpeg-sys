@@ -101,7 +101,7 @@ jobs:
           sudo apt update
           sudo apt install -y --no-install-recommends clang curl pkg-config ca-certificates llvm pkg-config curl libssl-dev yasm nasm libx264-dev
 
-      - name: Build and staitcally link latest ffmpeg
+      - name: Build and statically link latest ffmpeg
         run: |
           cargo build --features $FEATURES -vv
           cargo test --features $FEATURES

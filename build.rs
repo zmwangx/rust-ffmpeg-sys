@@ -912,6 +912,10 @@ fn check_features(
             .find(&search_str)
             .expect("Variable not found in output")
             + search_str.len();
+        println!(
+            r#"cargo:rustc-check-cfg=cfg(feature, values("{}"))"#,
+            ffmpeg_version_flag
+        );
         if &stdout[pos..pos + 1] == "1" {
             println!(r#"cargo:rustc-cfg=feature="{ffmpeg_version_flag}""#);
             println!(r#"cargo:{ffmpeg_version_flag}=true"#);

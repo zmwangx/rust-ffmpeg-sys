@@ -19,8 +19,8 @@ doctest = false
 libc = "0.2"
 
 [build-dependencies]
-num_cpus   = "1.16"
-cc         = "1.1"
+num_cpus   = "1.17"
+cc         = "1.2"
 pkg-config = "0.3"
 bindgen    = { version = "0.72", default-features = false, features = ["runtime"] }
 

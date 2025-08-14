@@ -234,3 +234,53 @@ pub const AV_PIX_FMT_XYZ12: AVPixelFormat = AV_PIX_FMT_XYZ12BE;
 pub const AV_PIX_FMT_NV20: AVPixelFormat = AV_PIX_FMT_NV20BE;
 #[cfg(target_endian = "big")]
 pub const AV_PIX_FMT_AYUV64: AVPixelFormat = AV_PIX_FMT_AYUV64BE;
+
+#[cfg(all(feature = "ffmpeg_8_0", target_endian = "little"))]
+pub const AV_PIX_FMT_V30X: AVPixelFormat = AV_PIX_FMT_V30XLE;
+#[cfg(all(feature = "ffmpeg_8_0", target_endian = "big"))]
+pub const AV_PIX_FMT_V30X: AVPixelFormat = AV_PIX_FMT_V30XBE;
+
+#[cfg(all(feature = "ffmpeg_8_0", target_endian = "little"))]
+pub const AV_PIX_FMT_RGBF16: AVPixelFormat = AV_PIX_FMT_RGBF16LE;
+#[cfg(all(feature = "ffmpeg_8_0", target_endian = "big"))]
+pub const AV_PIX_FMT_RGBF16: AVPixelFormat = AV_PIX_FMT_RGBF16BE;
+
+#[cfg(all(feature = "ffmpeg_8_0", target_endian = "little"))]
+pub const AV_PIX_FMT_RGB96: AVPixelFormat = AV_PIX_FMT_RGB96LE;
+#[cfg(all(feature = "ffmpeg_8_0", target_endian = "big"))]
+pub const AV_PIX_FMT_RGB96: AVPixelFormat = AV_PIX_FMT_RGB96BE;
+
+#[cfg(all(feature = "ffmpeg_8_0", target_endian = "little"))]
+pub const AV_PIX_FMT_RGBA128: AVPixelFormat = AV_PIX_FMT_RGBA128LE;
+#[cfg(all(feature = "ffmpeg_8_0", target_endian = "big"))]
+pub const AV_PIX_FMT_RGBA128: AVPixelFormat = AV_PIX_FMT_RGBA128BE;
+
+#[cfg(all(feature = "ffmpeg_8_0", target_endian = "little"))]
+pub const AV_PIX_FMT_Y216: AVPixelFormat = AV_PIX_FMT_Y216LE;
+#[cfg(all(feature = "ffmpeg_8_0", target_endian = "big"))]
+pub const AV_PIX_FMT_Y216: AVPixelFormat = AV_PIX_FMT_Y216BE;
+
+#[cfg(all(feature = "ffmpeg_8_0", target_endian = "little"))]
+pub const AV_PIX_FMT_XV48: AVPixelFormat = AV_PIX_FMT_XV48LE;
+#[cfg(all(feature = "ffmpeg_8_0", target_endian = "big"))]
+pub const AV_PIX_FMT_XV48: AVPixelFormat = AV_PIX_FMT_XV48BE;
+
+#[cfg(all(feature = "ffmpeg_8_0", target_endian = "little"))]
+pub const AV_PIX_FMT_YUV444P10MSB: AVPixelFormat = AV_PIX_FMT_YUV444P10MSBLE;
+#[cfg(all(feature = "ffmpeg_8_0", target_endian = "big"))]
+pub const AV_PIX_FMT_YUV444P10MSB: AVPixelFormat = AV_PIX_FMT_YUV444P10MSBBE;
+
+#[cfg(all(feature = "ffmpeg_8_0", target_endian = "little"))]
+pub const AV_PIX_FMT_YUV444P12MSB: AVPixelFormat = AV_PIX_FMT_YUV444P12MSBLE;
+#[cfg(all(feature = "ffmpeg_8_0", target_endian = "big"))]
+pub const AV_PIX_FMT_YUV444P12MSB: AVPixelFormat = AV_PIX_FMT_YUV444P12MSBBE;
+
+#[cfg(all(feature = "ffmpeg_8_0", target_endian = "little"))]
+pub const AV_PIX_FMT_GBRP10MSB: AVPixelFormat = AV_PIX_FMT_GBRP10MSBLE;
+#[cfg(all(feature = "ffmpeg_8_0", target_endian = "big"))]
+pub const AV_PIX_FMT_GBRP10MSB: AVPixelFormat = AV_PIX_FMT_GBRP10MSBBE;
+
+#[cfg(all(feature = "ffmpeg_8_0", target_endian = "little"))]
+pub const AV_PIX_FMT_GBRP12MSB: AVPixelFormat = AV_PIX_FMT_GBRP12MSBLE;
+#[cfg(all(feature = "ffmpeg_8_0", target_endian = "big"))]
+pub const AV_PIX_FMT_GBRP12MSB: AVPixelFormat = AV_PIX_FMT_GBRP12MSBBE;
