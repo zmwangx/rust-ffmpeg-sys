@@ -1444,6 +1444,12 @@ fn main() {
         .iter()
         .map(|include| format!("-I{}", include.to_string_lossy()));
 
+    let size_t_is_usize_value = if env::var("CARGO_FFMPEG_SYS_DISABLE_SIZE_T_IS_USIZE").is_ok() {
+        false
+    } else {
+        true
+    };
+
     // The bindgen::Builder is the main entry point
     // to bindgen, and lets you build up options for
     // the resulting bindings.
@@ -1543,7 +1549,7 @@ fn main() {
         })
         .prepend_enum_name(false)
         .derive_eq(true)
-        .size_t_is_usize(true)
+        .size_t_is_usize(size_t_is_usize_value)
         .parse_callbacks(Box::new(Callbacks));
 
     if let Some(sysroot) = sysroot.as_deref() {
