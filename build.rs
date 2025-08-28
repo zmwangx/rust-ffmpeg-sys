@@ -955,6 +955,7 @@ fn link_to_libraries(statik: bool) {
 }
 
 fn main() {
+    let target_triple = env::var("TARGET").unwrap();
     let statik = env::var("CARGO_FEATURE_STATIC").is_ok();
     let ffmpeg_major_version: u32 = env!("CARGO_PKG_VERSION_MAJOR").parse().unwrap();
 
@@ -1444,11 +1445,18 @@ fn main() {
         .iter()
         .map(|include| format!("-I{}", include.to_string_lossy()));
 
+    let clang_args = std::iter::empty()
+        .chain(clang_includes.into_iter())
+        .chain([
+            "-target".to_string(), target_triple.clone(),
+        ])
+        .collect::<Vec<_>>();
+
     // The bindgen::Builder is the main entry point
     // to bindgen, and lets you build up options for
     // the resulting bindings.
     let mut builder = bindgen::Builder::default()
-        .clang_args(clang_includes)
+        .clang_args(clang_args)
         .ctypes_prefix("libc")
         // https://github.com/rust-lang/rust-bindgen/issues/550
         .blocklist_type("max_align_t")
