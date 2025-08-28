@@ -1077,10 +1077,16 @@ fn main() {
     }
     // Fallback to pkg-config
     else {
-        pkg_config::Config::new()
+        match pkg_config::Config::new()
             .statik(statik)
             .probe("libavutil")
-            .unwrap();
+            {
+                Ok(library) => library,
+                Err(e) => {
+                    eprint!("Error: {}", e);
+                    return;
+                },
+            };
 
         let mut libs = vec![
             ("libavformat", "AVFORMAT"),
