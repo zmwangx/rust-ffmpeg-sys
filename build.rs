@@ -954,6 +954,63 @@ fn link_to_libraries(statik: bool) {
     }
 }
 
+fn clang_link_search_path() -> Option<String> {
+    let output = Command::new("/usr/bin/clang")
+        .arg("--print-search-dirs")
+        .output();
+    if let Ok(output) = output {
+        if output.status.success() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            for line in stdout.lines() {
+                if line.contains("libraries: =") {
+                    let path = line.split('=').nth(1).unwrap();
+                    return Some(format!("{}/lib/darwin", path));
+                }
+            }
+        }
+    }
+    None
+}
+
+fn clang_rt_lib() -> Option<String> {
+    let os = env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
+    let abi = env::var("CARGO_CFG_TARGET_ABI").unwrap_or_default();
+    let suffix = match os.as_str() {
+        "darwin" | "macos" => "osx",
+        "ios" => {
+            if abi == "sim" {
+                "iossim"
+            } else {
+                "ios"
+            }
+        }
+        "tvos" => {
+            if abi == "sim" {
+                "tvossim"
+            } else {
+                "tvos"
+            }
+        }
+        "watchOS" => {
+            if abi == "sim" {
+                "watchossim"
+            } else {
+                "watchos"
+            }
+        }
+        "xros" | "visionos" => {
+            if abi == "sim" {
+                "xrossim"
+            } else {
+                "xros"
+            }
+        }
+        _ => return None,
+    };
+
+    Some(format!("clang_rt.{suffix}"))
+}
+
 fn main() {
     let statik = env::var("CARGO_FEATURE_STATIC").is_ok();
     let ffmpeg_major_version: u32 = env!("CARGO_PKG_VERSION_MAJOR").parse().unwrap();
@@ -1135,6 +1192,14 @@ fn main() {
         ];
         for f in frameworks {
             println!("cargo:rustc-link-lib=framework={f}");
+        }
+    }
+
+    // Fixed: missing symbols ___isPlatformVersionAtLeast
+    if let Some(lib) = clang_rt_lib() {
+        if let Some(path) = clang_link_search_path() {
+            println!("cargo:rustc-link-lib={}", lib);
+            println!("cargo:rustc-link-search={}", path);
         }
     }
 
