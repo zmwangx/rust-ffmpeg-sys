@@ -1075,6 +1075,8 @@ fn main() {
             // avutil dependencies
             println!("cargo:rustc-link-lib=bcrypt");
             println!("cargo:rustc-link-lib=user32");
+            println!("cargo:rustc-link-lib=strmiids");
+            println!("cargo:rustc-link-lib=mfuuid");
         }
 
         paths
