@@ -4,6 +4,7 @@ extern crate num_cpus;
 extern crate pkg_config;
 
 use std::env;
+use std::ffi::OsString;
 use std::fmt::Write as FmtWrite;
 use std::fs::{self, File};
 use std::io::{self, BufRead, BufReader, Write};
@@ -529,6 +530,22 @@ fn build(sysroot: Option<&str>) -> io::Result<()> {
     enable!(configure, "BUILD_LIB_X265", "libx265");
     enable!(configure, "BUILD_LIB_AVS", "libavs");
     enable!(configure, "BUILD_LIB_XVID", "libxvid");
+
+    enable!(configure, "BUILD_LIB_DECKLINK", "decklink");
+    if env::var("CARGO_FEATURE_BUILD_LIB_DECKLINK").is_ok() {
+        match env::var_os("FFMPEG_DECKLINK_SDK_INCLUDE") {
+            Some(path) => {
+                let mut flags = OsString::from("--extra-cflags=-I");
+                flags.push(path);
+                configure.arg(flags);
+            }
+            None => {
+                eprintln!("Warning: missing environment variable FFMPEG_DECKLINK_SDK_INCLUDE, compilation may fail");
+                eprintln!("FFMPEG_DECKLINK_SDK_INCLUDE should be a path to decklink SDK (v12.9) include folder");
+                eprintln!("Please do not include space in path");
+            }
+        }
+    }
 
     // make sure to only enable related hw acceleration features for a correct
     // target os. This allows to leave allows cargo features enable and control

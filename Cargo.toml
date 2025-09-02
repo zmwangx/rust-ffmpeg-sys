@@ -95,6 +95,7 @@ build-lib-x264             = ["build"]
 build-lib-x265             = ["build"]
 build-lib-avs              = ["build"]
 build-lib-xvid             = ["build"]
+build-lib-decklink         = ["build"]
 
 # hardware accelleration
 build-videotoolbox = ["build"]
