@@ -1541,14 +1541,14 @@ fn main() {
         .blocklist_function("y0l")
         .blocklist_function("y1l")
         .blocklist_function("ynl")
-        .blocklist_type("^Vk[A-Z].*")
-        .blocklist_function("^vk[A-Z].*")
-        .blocklist_type("^PFN_vk[A-Z].*") // vulkan.h
-        .blocklist_type("^StdVideo.*") // vulkan.h
-        .blocklist_var("^VK_.*")
-        .blocklist_var("^STD_VIDEO_.*")
-        .blocklist_var("^vulkan_video_codec_.*")
-        .blocklist_var("^VULKAN_VIDEO_CODEC_.*")
+        .blocklist_type("^Vk[A-Z].*") // vulkan, use ash instead
+        .blocklist_function("^vk[A-Z].*") // vulkan, use ash instead
+        .blocklist_type("^PFN_vk[A-Z].*") // vulkan, use ash instead
+        .blocklist_type("^StdVideo.*") // vulkan, use ash instead
+        .blocklist_var("^VK_.*") // vulkan, use ash instead
+        .blocklist_var("^STD_VIDEO_.*") // vulkan, use ash instead
+        .blocklist_var("^vulkan_video_codec_.*") // vulkan, use ash instead
+        .blocklist_var("^VULKAN_VIDEO_CODEC_.*") // vulkan, use ash instead
         .opaque_type("__mingw_ldbl_type_t")
         .default_enum_style(bindgen::EnumVariation::Rust {
             non_exhaustive: env::var("CARGO_FEATURE_NON_EXHAUSTIVE_ENUMS").is_ok(),

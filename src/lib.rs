@@ -15,6 +15,9 @@ extern crate libc;
 #[cfg(feature = "vulkan")]
 extern crate ash;
 
+// ffmpeg used vulkan types in it's headers. Instead of having bindgen generate vulkan.h structs,
+// we blocklist them for bindgen then use the ash crate's vulkan bindings instead. This maps themn from the ash names
+// to the vulkan.h names
 #[cfg(feature = "vulkan")]
 use ash::vk::{
     AccessFlags as VkAccessFlagBits, Device as VkDevice, DeviceMemory as VkDeviceMemory,
