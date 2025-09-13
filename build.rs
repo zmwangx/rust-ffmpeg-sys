@@ -1541,6 +1541,14 @@ fn main() {
         .blocklist_function("y0l")
         .blocklist_function("y1l")
         .blocklist_function("ynl")
+        .blocklist_type("^Vk[A-Z].*") // vulkan, use ash instead
+        .blocklist_function("^vk[A-Z].*") // vulkan, use ash instead
+        .blocklist_type("^PFN_vk[A-Z].*") // vulkan, use ash instead
+        .blocklist_type("^StdVideo.*") // vulkan, use ash instead
+        .blocklist_var("^VK_.*") // vulkan, use ash instead
+        .blocklist_var("^STD_VIDEO_.*") // vulkan, use ash instead
+        .blocklist_var("^vulkan_video_codec_.*") // vulkan, use ash instead
+        .blocklist_var("^VULKAN_VIDEO_CODEC_.*") // vulkan, use ash instead
         .opaque_type("__mingw_ldbl_type_t")
         .default_enum_style(bindgen::EnumVariation::Rust {
             non_exhaustive: env::var("CARGO_FEATURE_NON_EXHAUSTIVE_ENUMS").is_ok(),
@@ -1668,6 +1676,16 @@ fn main() {
         maybe_search_include(&include_paths, "libavutil/hwcontext_drm.h")
     {
         builder = builder.header(hwcontext_drm_header);
+    }
+
+    if env::var("CARGO_FEATURE_VULKAN").is_ok() {
+        if let Some(hwcontext_vulkan_header) =
+            maybe_search_include(&include_paths, "libavutil/hwcontext_vulkan.h")
+        {
+            builder = builder.header(hwcontext_vulkan_header);
+        } else {
+            panic!("vulkan feature asked for but no vulkan header?");
+        }
     }
 
     // Finish the builder and generate the bindings.
