@@ -1,6 +1,6 @@
 [package]
 name    = "ffmpeg-sys-next"
-version = "8.0.1"
+version = "7.1.3"
 build   = "build.rs"
 links   = "ffmpeg"
 
@@ -32,6 +32,15 @@ default  = ["avcodec", "avdevice", "avfilter", "avformat", "swresample", "swscal
 
 static = []
 build  = ["static"]
+
+# FFmpeg version features
+ffmpeg_4_4 = []
+ffmpeg_5_0 = []
+ffmpeg_5_1 = []
+ffmpeg_6_0 = []
+ffmpeg_6_1 = []
+ffmpeg_7_0 = []
+ffmpeg_8_0 = []
 
 # mark enums in generated bindings as #[non_exhaustive]
 non-exhaustive-enums = []

@@ -1065,6 +1065,9 @@ fn main() {
         if statik {
             if cfg!(feature = "avcodec") || cfg!(feature = "avdevice") {
                 println!("cargo:rustc-link-lib=ole32");
+                println!("cargo:rustc-link-lib=mfplat");
+                println!("cargo:rustc-link-lib=strmiids");
+                println!("cargo:rustc-link-lib=mfuuid");
             }
 
             if cfg!(feature = "avformat") {
@@ -1456,7 +1459,51 @@ fn main() {
         .ctypes_prefix("libc")
         // https://github.com/rust-lang/rust-bindgen/issues/550
         .blocklist_type("max_align_t")
-        .blocklist_function("_.*")
+        // .blocklist_function("_.*")
+        // 忽略特定的类型和错误
+        // .blocklist_type("_Float16")
+        // .blocklist_type("_Float32")
+        // .blocklist_type("_Float64")
+        // .blocklist_type("_Float128")
+        // 直接定义_Float16类型为兼容类型
+        .clang_arg("-D_Float16=float")
+        .clang_arg("-D__FLOAT16_TYPE__=float")
+        .clang_arg("-D__FLT16_MANT_DIG__=11")
+        .clang_arg("-D__FLT16_MIN_EXP__=-14")
+        .clang_arg("-D__FLT16_MAX_EXP__=15")
+        .clang_arg("-D__FLT16_MIN__=6.103515625e-05f")
+        .clang_arg("-D__FLT16_MAX__=65504.0f")
+        .clang_arg("-D__FLT16_EPSILON__=0.0009765625f")
+        // 忽略编译错误和警告
+        // .clang_arg("-Wno-error=typedef-redefinition")
+        // .clang_arg("-Wno-error=microsoft-cast")
+        // .clang_arg("-Wno-error=gnu-variable-sized-type-not-at-end")
+        // .clang_arg("-Wno-error=ignored-attributes")
+        // .clang_arg("-Wno-error=unused-value")
+        // .clang_arg("-ferror-limit=1000")
+        // 允许递归包含但限制在FFmpeg目录内
+        // .allowlist_recursively(false)
+        // 更宽松的allowlist配置，确保所有FFmpeg相关的类型和函数都被正确包含
+        // .allowlist_var("AV_.*")
+        // .allowlist_var("FF_.*")
+        // .allowlist_var("SWR_.*")
+        // .allowlist_var("SWS_.*")
+        // .allowlist_var("PP_.*")
+        // .allowlist_type("AV.*")
+        // .allowlist_type("FF.*")
+        // .allowlist_type("SwrContext")
+        // .allowlist_type("SwsContext")
+        // .allowlist_type("DCTContext")
+        // .allowlist_type("RDFTContext")
+        // .allowlist_type("DCTTransformType")
+        // .allowlist_type("RcOverride")
+        // .allowlist_type("RDFTransformType")
+        // .allowlist_type("av_format_control_message")
+        // .allowlist_type("__va_list_tag")
+        // .allowlist_function("av_.*")
+        // .allowlist_function("sws_.*")
+        // .allowlist_function("swr_.*")
+        // .allowlist_function("pp_.*")
         // Blocklist functions with u128 in signature.
         // https://github.com/zmwangx/rust-ffmpeg-sys/issues/1
         // https://github.com/rust-lang/rust-bindgen/issues/1549
@@ -1552,7 +1599,26 @@ fn main() {
 
     if let Some(sysroot) = sysroot.as_deref() {
         builder = builder.clang_arg(format!("--sysroot={sysroot}"));
+    } else {
+        // 在macOS上添加系统头文件路径
+        #[cfg(target_os = "macos")]
+
+        {
+            // 添加默认的系统头文件路径
+            builder = builder.clang_arg("-I/usr/include");
+            // 尝试通过xcrun获取SDK路径并添加
+            if let Ok(sdk_path) = Command::new("xcrun").args(["--show-sdk-path"]).output() {
+                if sdk_path.status.success() {
+                    if let Ok(sdk_path_str) = std::str::from_utf8(&sdk_path.stdout) {
+                        let sdk_path_trimmed = sdk_path_str.trim();
+                        builder = builder.clang_arg(format!("-I{}/usr/include", sdk_path_trimmed));
+                    }
+                }
+            }
+        }
     }
+    
+    println!("cargo:warning=sysroot={sysroot:?}");
 
     // The input headers we would like to generate
     // bindings for.
