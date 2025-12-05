@@ -376,15 +376,28 @@ fn build(sysroot: Option<&str>) -> io::Result<()> {
         configure.arg(format!("--cc={android_cc_raw_path}"));
 
         for tool in ["nm", "strip"] {
-            configure.arg(format!(
-                "--{tool}={}",
-                android_cc_path
-                    .join("..")
-                    .join(format!("llvm-{tool}"))
-                    .canonicalize()
-                    .unwrap_or_else(|_| panic!("failed to resolve a path to android {}", tool))
-                    .display()
-            ));
+            // most common when using cargo-ndk
+            let mut candidate = android_cc_path
+                .parent()
+                .unwrap()
+                .join(format!("llvm-{}", tool));
+
+            // get from variable if exists
+            if !candidate.exists() {
+                let env_tool = format!("{}_{}", tool.to_uppercase(), target.replace("-", "_"));
+                if let Ok(val) = env::var(&env_tool) {
+                    let p = Path::new(&val);
+                    if p.exists() {
+                        candidate = p.to_path_buf();
+                    } else {
+                        panic!("{} was set but file does not exist: {}", env_tool, val);
+                    }
+                } else {
+                    panic!("Failed to resolve a path to android {} (checked {:?})", tool, candidate);
+                }
+            }
+            
+            configure.arg(format!("--{}={}", tool, candidate.display()));
         }
 
         if let Ok(android_target_flags) = env::var(format!("CFLAGS_{target}")).as_deref() {
