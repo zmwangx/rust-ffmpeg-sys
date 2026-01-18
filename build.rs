@@ -319,12 +319,18 @@ fn build(sysroot: Option<&str>) -> io::Result<()> {
         // platform version, so we provide direct compiler paths manually instead
         if env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("android") {
             let compiler = cc.get_compiler();
-            let compiler = compiler.path().file_stem().unwrap().to_str().unwrap();
+            if let Some(compiler_name) = compiler
+                .path()
+                .file_stem()
+                .and_then(|s| s.to_str())
+            {
+                if let Some(suffix_pos) = compiler_name.rfind('-') {
+                    let prefix = compiler_name[0..suffix_pos].trim_end_matches("-wr"); // "wr-c++" compiler
 
-            if let Some(suffix_pos) = compiler.rfind('-') {
-                let prefix = compiler[0..suffix_pos].trim_end_matches("-wr"); // "wr-c++" compiler
-
-                configure.arg(format!("--cross-prefix={prefix}-"));
+                    configure.arg(format!("--cross-prefix={prefix}-"));
+                }
+            } else {
+                eprintln!("warning: Could not determine cross-compiler prefix from path: {:?}", compiler.path());
             }
         }
     } else {
@@ -929,7 +935,11 @@ fn search_include(include_paths: &[PathBuf], header: &str) -> String {
     for dir in include_paths {
         let include = dir.join(header);
         if fs::metadata(&include).is_ok() {
-            return include.as_path().to_str().unwrap().to_string();
+            if let Some(path_str) = include.as_path().to_str() {
+                return path_str.to_string();
+            }
+            // Fall back to lossy conversion if path contains non-UTF8 characters
+            return include.to_string_lossy().to_string();
         }
     }
     format!("/usr/include/{header}")
@@ -1021,7 +1031,7 @@ fn main() {
                 .for_each(|lib_search_path| {
                     println!(
                         "cargo:rustc-link-search=native={}",
-                        lib_search_path.to_str().unwrap()
+                        lib_search_path.to_string_lossy()
                     );
                 })
         }
@@ -1081,10 +1091,25 @@ fn main() {
     }
     // Fallback to pkg-config
     else {
-        pkg_config::Config::new()
+        let avutil_result = pkg_config::Config::new()
             .statik(statik)
-            .probe("libavutil")
-            .unwrap();
+            .probe("libavutil");
+
+        if let Err(e) = avutil_result {
+            eprintln!("error: FFmpeg not found.");
+            eprintln!();
+            eprintln!("FFmpeg libraries could not be found using any of the following methods:");
+            eprintln!("  1. FFMPEG_DIR environment variable (not set)");
+            eprintln!("  2. vcpkg package manager (ffmpeg package not found)");
+            eprintln!("  3. pkg-config (libavutil not found: {})", e);
+            eprintln!();
+            eprintln!("To fix this, please do one of the following:");
+            eprintln!("  - Set FFMPEG_DIR to point to your FFmpeg installation directory");
+            eprintln!("  - Install FFmpeg via vcpkg: vcpkg install ffmpeg");
+            eprintln!("  - Install FFmpeg and ensure pkg-config can find it");
+            eprintln!("  - Enable the 'build' feature to compile FFmpeg from source");
+            std::process::exit(1);
+        }
 
         let mut libs = vec![
             ("libavformat", "AVFORMAT"),
@@ -1099,18 +1124,32 @@ fn main() {
 
         for (lib_name, env_variable_name) in libs.iter() {
             if env::var(format!("CARGO_FEATURE_{env_variable_name}")).is_ok() {
-                pkg_config::Config::new()
+                if let Err(e) = pkg_config::Config::new()
                     .statik(statik)
                     .probe(lib_name)
-                    .unwrap();
+                {
+                    eprintln!("error: FFmpeg library {} not found: {}", lib_name, e);
+                    eprintln!();
+                    eprintln!("The {} library is required but could not be found.", lib_name);
+                    eprintln!("Please ensure FFmpeg is installed with all required components.");
+                    std::process::exit(1);
+                }
             }
         }
 
-        pkg_config::Config::new()
+        match pkg_config::Config::new()
             .statik(statik)
             .probe("libavcodec")
-            .unwrap()
-            .include_paths
+        {
+            Ok(lib) => lib.include_paths,
+            Err(e) => {
+                eprintln!("error: FFmpeg library libavcodec not found: {}", e);
+                eprintln!();
+                eprintln!("The libavcodec library is required but could not be found.");
+                eprintln!("Please ensure FFmpeg is installed with all required components.");
+                std::process::exit(1);
+            }
+        }
     };
 
     if statik
