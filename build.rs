@@ -328,8 +328,38 @@ fn build(sysroot: Option<&str>) -> io::Result<()> {
             }
         }
     } else {
-        // tune the compiler for the host arhitecture
-        configure.arg("--extra-cflags=-march=native -mtune=native");
+        // Determine -march/-mtune flags for the compiler.
+        // Priority: env vars > build-portable feature > default (native)
+        println!("cargo:rerun-if-env-changed=FFMPEG_MARCH");
+        println!("cargo:rerun-if-env-changed=FFMPEG_MTUNE");
+
+        let march_env = env::var("FFMPEG_MARCH").ok();
+        let mtune_env = env::var("FFMPEG_MTUNE").ok();
+
+        let (march, mtune) = if march_env.is_some() || mtune_env.is_some() {
+            // Env vars take highest priority. Empty string means omit the flag.
+            (
+                march_env.unwrap_or_else(|| "native".to_string()),
+                mtune_env.unwrap_or_else(|| "native".to_string()),
+            )
+        } else if cfg!(feature = "build-portable") {
+            // Omit both flags so the compiler uses its baseline target.
+            (String::new(), String::new())
+        } else {
+            // Default: tune for the host architecture.
+            ("native".to_string(), "native".to_string())
+        };
+
+        let mut parts = Vec::new();
+        if !march.is_empty() {
+            parts.push(format!("-march={march}"));
+        }
+        if !mtune.is_empty() {
+            parts.push(format!("-mtune={mtune}"));
+        }
+        if !parts.is_empty() {
+            configure.arg(format!("--extra-cflags={}", parts.join(" ")));
+        }
     }
 
     if env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows") {
