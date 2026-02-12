@@ -42,6 +42,7 @@ build-license-nonfree  = ["build"]
 build-license-version3 = ["build"]
 
 # misc
+build-march-generic = ["build"]
 build-drm   = ["build"]
 build-nvenc = ["build"]
 build-pic   = ["build"]
