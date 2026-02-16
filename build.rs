@@ -195,7 +195,7 @@ fn switch(configure: &mut Command, feature: &str, name: &str) {
 fn get_ffmpeg_target_os() -> String {
     let cargo_target_os = env::var("CARGO_CFG_TARGET_OS").unwrap();
     match cargo_target_os.as_str() {
-        "ios" => "darwin".to_string(),
+        "ios" | "macos" => "darwin".to_string(),
         _ => cargo_target_os,
     }
 }
