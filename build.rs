@@ -319,12 +319,12 @@ fn build(sysroot: Option<&str>) -> io::Result<()> {
         // platform version, so we provide direct compiler paths manually instead
         if env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("android") {
             let compiler = cc.get_compiler();
-            let compiler = compiler.path().file_stem().unwrap().to_str().unwrap();
+            if let Some(compiler) = compiler.path().file_stem().and_then(|s| s.to_str()) {
+                if let Some(suffix_pos) = compiler.rfind('-') {
+                    let prefix = compiler[0..suffix_pos].trim_end_matches("-wr"); // "wr-c++" compiler
 
-            if let Some(suffix_pos) = compiler.rfind('-') {
-                let prefix = compiler[0..suffix_pos].trim_end_matches("-wr"); // "wr-c++" compiler
-
-                configure.arg(format!("--cross-prefix={prefix}-"));
+                    configure.arg(format!("--cross-prefix={prefix}-"));
+                }
             }
         }
     } else {
@@ -929,7 +929,7 @@ fn search_include(include_paths: &[PathBuf], header: &str) -> String {
     for dir in include_paths {
         let include = dir.join(header);
         if fs::metadata(&include).is_ok() {
-            return include.as_path().to_str().unwrap().to_string();
+            return include.as_path().to_string_lossy().into_owned();
         }
     }
     format!("/usr/include/{header}")
@@ -1021,7 +1021,7 @@ fn main() {
                 .for_each(|lib_search_path| {
                     println!(
                         "cargo:rustc-link-search=native={}",
-                        lib_search_path.to_str().unwrap()
+                        lib_search_path.to_string_lossy()
                     );
                 })
         }
@@ -1081,10 +1081,16 @@ fn main() {
     }
     // Fallback to pkg-config
     else {
+        const FFMPEG_NOT_FOUND_HELP: &str = "Could not find FFmpeg via pkg-config. \
+            Please install the FFmpeg development libraries (e.g. `apt install libavcodec-dev` \
+            on Debian/Ubuntu, `brew install ffmpeg` on macOS, or vcpkg on Windows), \
+            or set the FFMPEG_DIR environment variable to your FFmpeg install path, \
+            or enable the `build` feature to compile FFmpeg from source.";
+
         pkg_config::Config::new()
             .statik(statik)
             .probe("libavutil")
-            .unwrap();
+            .unwrap_or_else(|e| panic!("{}\npkg-config error: {}", FFMPEG_NOT_FOUND_HELP, e));
 
         let mut libs = vec![
             ("libavformat", "AVFORMAT"),
@@ -1102,14 +1108,19 @@ fn main() {
                 pkg_config::Config::new()
                     .statik(statik)
                     .probe(lib_name)
-                    .unwrap();
+                    .unwrap_or_else(|e| {
+                        panic!(
+                            "{}\npkg-config error for {}: {}",
+                            FFMPEG_NOT_FOUND_HELP, lib_name, e
+                        )
+                    });
             }
         }
 
         pkg_config::Config::new()
             .statik(statik)
             .probe("libavcodec")
-            .unwrap()
+            .unwrap_or_else(|e| panic!("{}\npkg-config error: {}", FFMPEG_NOT_FOUND_HELP, e))
             .include_paths
     };
 
