@@ -1565,9 +1565,10 @@ fn main() {
         if ffmpeg_major_version < 5 {
             builder = builder.header(search_include(&include_paths, "libavcodec/vaapi.h"));
         }
-        let avfft_path = search_include(&include_paths, "libavcodec/avfft.h");
-        if std::path::Path::new(&avfft_path).exists() {
-            builder = builder.header(avfft_path);
+        if ffmpeg_major_version < 8 {
+            if let Some(avfft_path) = maybe_search_include(&include_paths, "libavcodec/avfft.h") {
+                builder = builder.header(avfft_path);
+            }
         }
     }
 
