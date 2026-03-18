@@ -17,12 +17,19 @@ In addition to feature flags declared in `Cargo.toml`, this crate performs vario
   - `ffmpeg_3_1`
   - `ffmpeg_3_2`
   - `ffmpeg_3_3`
-  - `ffmpeg_3_1`
+  - `ffmpeg_3_4`
   - `ffmpeg_4_0`
   - `ffmpeg_4_1`
   - `ffmpeg_4_2`
   - `ffmpeg_4_3`
   - `ffmpeg_4_4`
+  - `ffmpeg_5_0`
+  - `ffmpeg_5_1`
+  - `ffmpeg_6_0`
+  - `ffmpeg_6_1`
+  - `ffmpeg_7_0`
+  - `ffmpeg_7_1`
+  - `ffmpeg_8_0`
 
 - `avcodec_version_greater_than_<x>_<y>` (new in v4.3.2), e.g., `avcodec_version_greater_than_58_90`. The name should be self-explanatory.
 
