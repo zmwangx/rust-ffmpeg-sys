@@ -50,7 +50,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        ffmpeg_version: ["6.1", "7.0", "7.1", "8.0"]
+        ffmpeg_version: ["6.1", "7.0", "7.1", "8.0", "8.1"]
     env:
       CARGO_PROFILE_DEV_BUILD_OVERRIDE_DEBUG: true
       FEATURES: avcodec,avdevice,avfilter,avformat,swresample,swscale #,postproc
