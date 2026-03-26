@@ -195,8 +195,29 @@ fn switch(configure: &mut Command, feature: &str, name: &str) {
 fn get_ffmpeg_target_os() -> String {
     let cargo_target_os = env::var("CARGO_CFG_TARGET_OS").unwrap();
     match cargo_target_os.as_str() {
-        "ios" => "darwin".to_string(),
+        "ios" | "tvos" | "macos" => "darwin".to_string(),
+        "windows" => {
+            if env::var("CARGO_CFG_TARGET_ENV").as_deref() == Ok("gnu") {
+                "mingw32".to_string()
+            } else {
+                "win32".to_string()
+            }
+        },
+        "android" => "android".to_string(),
+        "emscripten" => "emscripten".to_string(),
         _ => cargo_target_os,
+    }
+}
+
+fn get_ffmpeg_target_arch() -> String {
+    let cargo_arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap();
+    match cargo_arch.as_str() {
+        "x86_64" => "x86_64".to_string(),
+        "x86" | "i686" => "x86".to_string(),
+        // FFmpeg's configure historically distinguishes arm64 (aarch64) and arm
+        "aarch64" => "arm64".to_string(),
+        "arm" => "arm".to_string(),
+        other => other.to_string(),
     }
 }
 
@@ -311,7 +332,7 @@ fn build(sysroot: Option<&str>) -> io::Result<()> {
 
         configure.arg(format!(
             "--arch={}",
-            env::var("CARGO_CFG_TARGET_ARCH").unwrap()
+            get_ffmpeg_target_arch()
         ));
         configure.arg(format!("--target-os={}", get_ffmpeg_target_os()));
 
@@ -343,6 +364,13 @@ fn build(sysroot: Option<&str>) -> io::Result<()> {
         println!("cargo:rustc-link-lib=dylib=bcrypt");
         println!("cargo:rustc-link-lib=dylib=shlwapi");
         println!("cargo:rustc-link-lib=dylib=shell32");
+        if env::var("CARGO_CFG_TARGET_ENV").as_deref() == Ok("gnu") {
+            // MinGW toolchains (Windows GNU) don't ship C23's <stdbit.h> yet; make
+            // sure FFmpeg's compat header is available so configure and the later
+            // build can include it without failing.
+            configure.arg("--extra-cflags=-Icompat/stdbit");
+            println!("cargo:warning=Added FFmpeg compat/stdbit include path for Windows GNU toolchain");
+        }
     }
 
     // for ios it is required to provide sysroot for both configure and bindgen
@@ -421,11 +449,7 @@ fn build(sysroot: Option<&str>) -> io::Result<()> {
     // make it static
     configure.arg("--enable-static");
     configure.arg("--disable-shared");
-    // windows includes threading in the standard library
-    #[cfg(not(target_env = "msvc"))]
-    {
-        configure.arg("--enable-pthreads");
-    }
+    
 
     // position independent code
     configure.arg("--enable-pic");
@@ -475,7 +499,19 @@ fn build(sysroot: Option<&str>) -> io::Result<()> {
     {
         switch(&mut configure, &lib.name.to_uppercase(), lib.name);
     }
-
+    let disable_pthreads = env::var("FFMPEG_DISABLE_PTHREADS").is_ok();
+    if disable_pthreads {
+        configure.arg("--disable-pthreads");
+        if env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows") {
+            configure.arg("--enable-w32threads");
+        }
+    } else {
+        // windows includes threading in the standard library
+        #[cfg(not(target_env = "msvc"))]
+        {
+            configure.arg("--enable-pthreads");
+        }
+    }
     // configure external SSL libraries
     enable!(configure, "BUILD_LIB_GNUTLS", "gnutls");
     enable!(configure, "BUILD_LIB_OPENSSL", "openssl");
