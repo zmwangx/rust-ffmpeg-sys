@@ -192,10 +192,39 @@ fn switch(configure: &mut Command, feature: &str, name: &str) {
     configure.arg(arg.to_string() + name);
 }
 
+fn is_apple_simulator() -> bool {
+    env::var("CARGO_CFG_TARGET_VENDOR").unwrap_or_default() == "apple"
+        && (env::var("CARGO_CFG_TARGET_ABI").unwrap_or_default() == "sim"
+            || env::var("CARGO_CFG_TARGET_ARCH").unwrap_or_default() == "x86_64")
+}
+
+fn apple_sdk_name(target_os: &str, is_sim: bool) -> Option<&'static str> {
+    match (target_os, is_sim) {
+        ("macos", _) => Some("macosx"),
+        ("ios", true) => Some("iphonesimulator"),
+        ("ios", false) => Some("iphoneos"),
+        ("tvos", true) => Some("appletvsimulator"),
+        ("tvos", false) => Some("appletvos"),
+        _ => None,
+    }
+}
+
+/// Returns the `-m*-version-min=` cflags for cross-compiling to Apple platforms.
+fn apple_version_min_cflag(target_os: &str, is_sim: bool) -> Option<&'static str> {
+    match (target_os, is_sim) {
+        ("ios", true) => Some("-mios-simulator-version-min=11.0"),
+        ("ios", false) => Some("-mios-version-min=11.0"),
+        ("macos", _) => Some("-mmacosx-version-min=10.11"),
+        ("tvos", true) => Some("-mappletvsimulator-version-min=13.0"),
+        ("tvos", false) => Some("-mappletvos-version-min=13.0"),
+        _ => None,
+    }
+}
+
 fn get_ffmpeg_target_os() -> String {
     let cargo_target_os = env::var("CARGO_CFG_TARGET_OS").unwrap();
     match cargo_target_os.as_str() {
-        "ios" => "darwin".to_string(),
+        "ios" | "tvos" => "darwin".to_string(),
         _ => cargo_target_os,
     }
 }
@@ -211,14 +240,16 @@ fn find_sysroot() -> Option<String> {
         return Some(sysroot.to_string());
     }
 
-    if env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("ios") {
+    if matches!(env::var("CARGO_CFG_TARGET_OS").as_deref(), Ok("ios") | Ok("tvos")) {
+        let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap();
+        let sdk = apple_sdk_name(&target_os, is_apple_simulator()).unwrap();
         let xcode_output = Command::new("xcrun")
-            .args(["--sdk", "iphoneos", "--show-sdk-path"])
+            .args(["--sdk", sdk, "--show-sdk-path"])
             .output()
             .expect("failed to run xcrun");
 
         if !xcode_output.status.success() {
-            panic!("Failed to run xcrun to get the ios sysroot, please install xcode tools or provide sysroot using $SYSROOT env. Error: {}", String::from_utf8_lossy(&xcode_output.stderr));
+            panic!("Failed to run xcrun to get the {} sysroot, please install xcode tools or provide sysroot using $SYSROOT env. Error: {}", sdk, String::from_utf8_lossy(&xcode_output.stderr));
         }
 
         let string = String::from_utf8(xcode_output.stdout)
@@ -345,14 +376,21 @@ fn build(sysroot: Option<&str>) -> io::Result<()> {
         println!("cargo:rustc-link-lib=dylib=shell32");
     }
 
-    // for ios it is required to provide sysroot for both configure and bindgen
+    // for ios/tvos it is required to provide sysroot for both configure and bindgen
     // for macos the easiest way is to run xcrun, for other platform we support $SYSROOT var
-    if env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("ios") {
-        let sysroot = sysroot.expect("The sysroot is required for ios cross compilation, make sure to have available xcode or provide the $SYSROOT env var");
+    let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap();
+    let is_sim = is_apple_simulator();
+
+    if matches!(target_os.as_str(), "ios" | "tvos") {
+        let sdk = apple_sdk_name(&target_os, is_sim).unwrap();
+        let sysroot = sysroot.expect(&format!(
+            "The sysroot is required for {} cross compilation, make sure to have available xcode or provide the $SYSROOT env var",
+            target_os
+        ));
         configure.arg(format!("--sysroot={sysroot}"));
 
         let cc = Command::new("xcrun")
-            .args(["--sdk", "iphoneos", "-f", "clang"])
+            .args(["--sdk", sdk, "-f", "clang"])
             .output()
             .expect("failed to run xcrun")
             .stdout;
@@ -533,29 +571,31 @@ fn build(sysroot: Option<&str>) -> io::Result<()> {
     // make sure to only enable related hw acceleration features for a correct
     // target os. This allows to leave allows cargo features enable and control
     // ffmpeg compilation using target only
-    let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap();
 
-    // Apple VideoToolbox (iOS and macOS)
+    // Apple VideoToolbox (iOS, macOS, and tvOS)
     if env::var("CARGO_FEATURE_BUILD_VIDEOTOOLBOX").is_ok()
-        && matches!(target_os.as_str(), "ios" | "macos")
+        && matches!(target_os.as_str(), "ios" | "macos" | "tvos")
     {
         configure.arg("--enable-videotoolbox");
 
-        if target != host && env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("ios") {
-            configure.arg("--extra-cflags=-mios-version-min=11.0");
-        }
-
-        if target != host && env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("macos") {
-            configure.arg("--extra-cflags=-mmacosx-version-min=10.11");
+        if target != host {
+            if let Some(flag) = apple_version_min_cflag(&target_os, is_sim) {
+                configure.arg(format!("--extra-cflags={flag}"));
+            }
         }
     }
 
-    // Apple audio hw acceleration API (iOS and macOS)
+    // Apple audio hw acceleration API (iOS, macOS, and tvOS)
     if env::var("CARGO_FEATURE_BUILD_AUDIOTOOLBOX").is_ok()
-        && matches!(target_os.as_str(), "ios" | "macos")
+        && matches!(target_os.as_str(), "ios" | "macos" | "tvos")
     {
         configure.arg("--enable-audiotoolbox");
-        configure.arg("--extra-cflags=-mios-version-min=11.0");
+
+        if target != host {
+            if let Some(flag) = apple_version_min_cflag(&target_os, is_sim) {
+                configure.arg(format!("--extra-cflags={flag}"));
+            }
+        }
     }
 
     // Linux video acceleration API (VAAPI)
@@ -1117,11 +1157,13 @@ fn main() {
     if statik
         && matches!(
             env::var("CARGO_CFG_TARGET_OS").as_deref(),
-            Ok("macos") | Ok("ios")
+            Ok("macos") | Ok("ios") | Ok("tvos")
         )
     {
+        let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap();
+
+        // Frameworks available on all Apple platforms (macOS, iOS, tvOS)
         let frameworks = vec![
-            "AppKit",
             "AudioToolbox",
             "AVFoundation",
             "CoreFoundation",
@@ -1130,16 +1172,26 @@ fn main() {
             "CoreServices",
             "CoreVideo",
             "Foundation",
-            "OpenCL",
-            "OpenGL",
-            "QTKit",
             "QuartzCore",
             "Security",
-            "VideoDecodeAcceleration",
             "VideoToolbox",
         ];
-        for f in frameworks {
+        for f in &frameworks {
             println!("cargo:rustc-link-lib=framework={f}");
+        }
+
+        // Frameworks only available on macOS
+        if target_os == "macos" {
+            let macos_frameworks = vec![
+                "AppKit",
+                "OpenCL",
+                "OpenGL",
+                "QTKit",
+                "VideoDecodeAcceleration",
+            ];
+            for f in &macos_frameworks {
+                println!("cargo:rustc-link-lib=framework={f}");
+            }
         }
     }
 
