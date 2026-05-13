@@ -203,12 +203,24 @@ fn get_ffmpeg_target_os() -> String {
 /// Find the sysroot required for a cross compilation by ffmpeg **and** bindgen
 /// @see https://github.com/rust-lang/rust-bindgen/issues/1229
 fn find_sysroot() -> Option<String> {
-    if env::var("CARGO_FEATURE_BUILD").is_err() || env::var("HOST") == env::var("TARGET") {
-        return None;
+    // sysroot in cc command arguments assume that we already use sysroot,
+    // even HOST == TARGET (say, run on ubuntu24, but build with ubuntu22 sysroot)
+    let cc = cc::Build::new().get_compiler().to_command();
+    for arg in cc.get_args() {
+        let arg_str = arg.to_string_lossy();
+        if let Some(sysroot) = arg_str.strip_prefix("--sysroot=") {
+            return Some(sysroot.into());
+        }
     }
 
+    // SYSROOT env var take higher priority than HOST==TARGET check,
+    // if we're under some well known cross build environment
     if let Ok(sysroot) = env::var("SYSROOT") {
-        return Some(sysroot.to_string());
+        return Some(sysroot);
+    }
+
+    if env::var("CARGO_FEATURE_BUILD").is_err() || env::var("HOST") == env::var("TARGET") {
+        return None;
     }
 
     if env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("ios") {
@@ -959,11 +971,26 @@ fn link_to_libraries(statik: bool) {
     }
 }
 
+fn as_abs(maybe_rel: String) -> String {
+    if PathBuf::from(&maybe_rel).is_relative() {
+        env::current_dir()
+            .unwrap()
+            .join(maybe_rel)
+            .to_string_lossy()
+            .into()
+    } else {
+        maybe_rel
+    }
+}
+
 fn main() {
     let statik = env::var("CARGO_FEATURE_STATIC").is_ok();
     let ffmpeg_major_version: u32 = env!("CARGO_PKG_VERSION_MAJOR").parse().unwrap();
 
-    let sysroot = find_sysroot();
+    // sysroot might be specified as relative directory,
+    // but compiler action at later stage run with different working directory
+    // so we always resolve the sysroot to abs before compiler action
+    let sysroot = find_sysroot().map(as_abs);
     let include_paths: Vec<PathBuf> = if env::var("CARGO_FEATURE_BUILD").is_ok() {
         println!(
             "cargo:rustc-link-search=native={}",
