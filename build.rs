@@ -240,7 +240,10 @@ fn find_sysroot() -> Option<String> {
         return Some(sysroot.to_string());
     }
 
-    if matches!(env::var("CARGO_CFG_TARGET_OS").as_deref(), Ok("ios") | Ok("tvos")) {
+    if matches!(
+        env::var("CARGO_CFG_TARGET_OS").as_deref(),
+        Ok("ios") | Ok("tvos")
+    ) {
         let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap();
         let sdk = apple_sdk_name(&target_os, is_apple_simulator()).unwrap();
         let xcode_output = Command::new("xcrun")
