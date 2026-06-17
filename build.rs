@@ -448,10 +448,7 @@ fn build(sysroot: Option<&str>) -> io::Result<()> {
 
     if matches!(target_os.as_str(), "ios" | "tvos") {
         let sdk = apple_sdk_name(&target_os, is_sim).unwrap();
-        let sysroot = sysroot.expect(&format!(
-            "The sysroot is required for {} cross compilation, make sure to have available xcode or provide the $SYSROOT env var",
-            target_os
-        ));
+        let sysroot = sysroot.unwrap_or_else(|| panic!("The sysroot is required for {} cross compilation, make sure to have available xcode or provide the $SYSROOT env var", target_os));
         configure.arg(format!("--sysroot={sysroot}"));
 
         let cc = Command::new("xcrun")
