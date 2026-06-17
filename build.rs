@@ -246,6 +246,26 @@ fn find_sysroot() -> Option<String> {
     None
 }
 
+/// Validate a CPU flag value (e.g. from FFMPEG_MARCH/FFMPEG_MTUNE) before passing
+/// it to the compiler, to prevent arbitrary string injection.
+fn validated_cpu_flag(var: &str, value: String) -> String {
+    if value.is_empty() {
+        return value; // omit the flag
+    }
+    let valid = !value.starts_with('-')
+        && value
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '.' | '+' | '_'));
+    if !valid {
+        panic!(
+            "Invalid {} value {:?}: only ASCII letters, digits and '-._+' are allowed \
+             (e.g. native, x86-64-v3, armv8.2-a+crc)",
+            var, value
+        );
+    }
+    value
+}
+
 fn build(sysroot: Option<&str>) -> io::Result<()> {
     let source_dir = source();
     if cfg!(target_os = "windows") {
@@ -338,9 +358,16 @@ fn build(sysroot: Option<&str>) -> io::Result<()> {
 
         let (march, mtune) = if march_env.is_some() || mtune_env.is_some() {
             // Env vars take highest priority. Empty string means omit the flag.
+            // Validate the values to prevent arbitrary string injection.
             (
-                march_env.unwrap_or_else(|| "native".to_string()),
-                mtune_env.unwrap_or_else(|| "native".to_string()),
+                validated_cpu_flag(
+                    "FFMPEG_MARCH",
+                    march_env.unwrap_or_else(|| "native".to_string()),
+                ),
+                validated_cpu_flag(
+                    "FFMPEG_MTUNE",
+                    mtune_env.unwrap_or_else(|| "native".to_string()),
+                ),
             )
         } else if cfg!(feature = "build-portable") {
             // Omit both flags so the compiler uses its baseline target.
