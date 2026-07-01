@@ -1070,7 +1070,7 @@ fn main() {
     let ffmpeg_major_version: u32 = env!("CARGO_PKG_VERSION_MAJOR").parse().unwrap();
 
     let sysroot = find_sysroot();
-    let include_paths: Vec<PathBuf> = if env::var("CARGO_FEATURE_BUILD").is_ok() {
+    let mut include_paths: Vec<PathBuf> = if env::var("CARGO_FEATURE_BUILD").is_ok() {
         println!(
             "cargo:rustc-link-search=native={}",
             search().join("lib").to_string_lossy()
@@ -1243,6 +1243,14 @@ fn main() {
             }
         }
     };
+
+    include_paths.extend(
+        pkg_config::Config::new()
+            .statik(statik)
+            .probe("cuda")
+            .unwrap()
+            .include_paths
+    );
 
     if statik
         && matches!(
@@ -1768,6 +1776,7 @@ fn main() {
         .header(search_include(&include_paths, "libavutil/hash.h"))
         .header(search_include(&include_paths, "libavutil/hmac.h"))
         .header(search_include(&include_paths, "libavutil/hwcontext.h"))
+        .header(search_include(&include_paths, "libavutil/hwcontext_cuda.h"))
         .header(search_include(&include_paths, "libavutil/imgutils.h"))
         .header(search_include(&include_paths, "libavutil/lfg.h"))
         .header(search_include(&include_paths, "libavutil/log.h"))
