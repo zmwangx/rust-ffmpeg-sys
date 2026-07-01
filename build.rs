@@ -1591,10 +1591,24 @@ fn main() {
         .iter()
         .map(|include| format!("-I{}", include.to_string_lossy()));
 
+    println!("cargo:rerun-if-changed=hwcontext_wrapper.h");
+    println!("cargo:rerun-if-changed=hwcontext_stubs/vulkan/vulkan.h");
+    println!("cargo:rerun-if-changed=hwcontext_stubs/VideoToolbox/VideoToolbox.h");
+    println!("cargo:rerun-if-changed=hwcontext_stubs/va/va.h");
+    println!("cargo:rerun-if-changed=hwcontext_stubs/mfxvideo.h");
+
+    // SDK shims (vulkan/, VideoToolbox/, va/, mfxvideo.h) used by hwcontext_wrapper.h.
+    let hwcontext_stub_dir = format!(
+        "-I{}/hwcontext_stubs",
+        env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR")
+    );
+
     // The bindgen::Builder is the main entry point
     // to bindgen, and lets you build up options for
     // the resulting bindings.
     let mut builder = bindgen::Builder::default()
+        // Shim dir first, so our stubs win over the real SDK headers on the path (by design, to avoid generating bindings for full SDKs).
+        .clang_arg(&hwcontext_stub_dir)
         .clang_args(clang_includes)
         .ctypes_prefix("libc")
         // https://github.com/rust-lang/rust-bindgen/issues/550
@@ -1768,7 +1782,6 @@ fn main() {
         .header(search_include(&include_paths, "libavutil/hash.h"))
         .header(search_include(&include_paths, "libavutil/hmac.h"))
         .header(search_include(&include_paths, "libavutil/hwcontext.h"))
-        .header("hwcontext_cuda_wrapper.h")
         .header(search_include(&include_paths, "libavutil/imgutils.h"))
         .header(search_include(&include_paths, "libavutil/lfg.h"))
         .header(search_include(&include_paths, "libavutil/log.h"))
@@ -1819,6 +1832,10 @@ fn main() {
     {
         builder = builder.header(hwcontext_drm_header);
     }
+
+    // Per-API hwcontext structs (CUDA, D3D11/12, VideoToolbox, MediaCodec,
+    // Vulkan, VAAPI, QSV) all bind through one wrapper.
+    builder = builder.header("hwcontext_wrapper.h");
 
     // Finish the builder and generate the bindings.
     let bindings = builder
