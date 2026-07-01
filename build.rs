@@ -1596,6 +1596,7 @@ fn main() {
     println!("cargo:rerun-if-changed=hwcontext_stubs/VideoToolbox/VideoToolbox.h");
     println!("cargo:rerun-if-changed=hwcontext_stubs/va/va.h");
     println!("cargo:rerun-if-changed=hwcontext_stubs/mfxvideo.h");
+    println!("cargo:rerun-if-changed=hwcontext_stubs/mfx/mfxvideo.h");
 
     // SDK shims (vulkan/, VideoToolbox/, va/, mfxvideo.h) used by hwcontext_wrapper.h.
     let hwcontext_stub_dir = format!(
