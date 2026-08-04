@@ -221,12 +221,14 @@ fn apple_version_min_cflag(target_os: &str, is_sim: bool) -> Option<&'static str
     }
 }
 
-fn get_ffmpeg_target_os() -> String {
-    let cargo_target_os = env::var("CARGO_CFG_TARGET_OS").unwrap();
-    match cargo_target_os.as_str() {
-        "ios" | "tvos" => "darwin".to_string(),
-        _ => cargo_target_os,
+fn get_ffmpeg_target_os(target_os: &str, target_env: &str) -> String {
+    match (target_os, target_env) {
+        ("ios" | "tvos", _) => "darwin",
+        ("windows", "msvc") => "win32",
+        ("windows", "gnu") => "mingw32",
+        _ => target_os,
     }
+    .to_string()
 }
 
 /// Find the sysroot required for a cross compilation by ffmpeg **and** bindgen
@@ -305,6 +307,9 @@ fn validated_cpu_flag(var: &str, value: String) -> String {
 }
 
 fn build(sysroot: Option<&str>) -> io::Result<()> {
+    let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap();
+    let target_env = env::var("CARGO_CFG_TARGET_ENV").unwrap_or_default();
+
     let source_dir = source();
     if cfg!(target_os = "windows") {
         let path = env::var("PATH").unwrap_or_default();
@@ -373,11 +378,14 @@ fn build(sysroot: Option<&str>) -> io::Result<()> {
             "--arch={}",
             env::var("CARGO_CFG_TARGET_ARCH").unwrap()
         ));
-        configure.arg(format!("--target-os={}", get_ffmpeg_target_os()));
+        configure.arg(format!(
+            "--target-os={}",
+            get_ffmpeg_target_os(&target_os, &target_env)
+        ));
 
         // cross-prefix won't work for android because they use different compiler for every
         // platform version, so we provide direct compiler paths manually instead
-        if env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("android") {
+        if target_os != "android" {
             let compiler = cc.get_compiler();
             if let Some(compiler_name) = compiler.path().file_stem().and_then(|s| s.to_str()) {
                 if let Some(suffix_pos) = compiler_name.rfind('-') {
@@ -434,7 +442,7 @@ fn build(sysroot: Option<&str>) -> io::Result<()> {
         }
     }
 
-    if env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows") {
+    if target_os == "windows" {
         // essential librareis on windowsw
         println!("cargo:rustc-link-lib=dylib=ole32");
         println!("cargo:rustc-link-lib=dylib=oleaut32");
@@ -449,7 +457,6 @@ fn build(sysroot: Option<&str>) -> io::Result<()> {
 
     // for ios/tvos it is required to provide sysroot for both configure and bindgen
     // for macos the easiest way is to run xcrun, for other platform we support $SYSROOT var
-    let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap();
     let is_sim = is_apple_simulator();
 
     if matches!(target_os.as_str(), "ios" | "tvos") {
@@ -471,7 +478,7 @@ fn build(sysroot: Option<&str>) -> io::Result<()> {
         ));
     }
 
-    if env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("android") {
+    if target_os == "android" {
         // cargo ndk auto populates rust env variables for android cross compilation
         // so we can just leverage the same compiler path and cflags for ffmpeg build
         let android_cc_raw_path = env::var(format!("CC_{target}")).expect("Missing CC path for android. Make sure to use cargo-ndk for adnrdoic cross compilation");
@@ -520,16 +527,16 @@ fn build(sysroot: Option<&str>) -> io::Result<()> {
         configure.arg("--disable-debug");
         configure.arg("--enable-stripping");
         configure.arg("--extra-cflags=-03 -ffast-math -funroll-loops");
-        #[cfg(not(target_os = "windows"))]
-        configure.arg("--extra-ldflags=-flto");
+        if target_os != "windows" {
+            configure.arg("--extra-ldflags=-flto");
+        }
     }
 
     // make it static
     configure.arg("--enable-static");
     configure.arg("--disable-shared");
     // windows includes threading in the standard library
-    #[cfg(not(target_env = "msvc"))]
-    {
+    if target_os != "windows" && target_env != "msvc" {
         configure.arg("--enable-pthreads");
     }
 
