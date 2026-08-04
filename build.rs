@@ -684,6 +684,12 @@ fn build(sysroot: Option<&str>) -> io::Result<()> {
         configure.arg("--enable-d3d11va");
     }
 
+    if env::var("CARGO_FEATURE_BUILD_LIB_D3D12VA").is_ok()
+        && matches!(target_os.as_str(), "windows")
+    {
+        configure.arg("--enable-d3d12va");
+    }
+
     // DirectX Video Acceleration 2 (Windows only)
     if env::var("CARGO_FEATURE_BUILD_LIB_DXVA2").is_ok() && matches!(target_os.as_str(), "windows")
     {
