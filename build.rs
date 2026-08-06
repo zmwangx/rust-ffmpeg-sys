@@ -229,6 +229,148 @@ fn get_ffmpeg_target_os() -> String {
     }
 }
 
+/// OHOS rust targets (e.g. `aarch64-unknown-linux-ohos`) report
+/// `target_os = "linux"` with `target_env = "ohos"` — the environment is the
+/// reliable discriminator.
+fn is_ohos() -> bool {
+    env::var("CARGO_CFG_TARGET_ENV").as_deref() == Ok("ohos")
+}
+
+/// Map the Rust target architecture to the clang target triple used by the
+/// OHOS NDK (e.g. `aarch64-unknown-linux-ohos` -> `aarch64-linux-ohos`).
+fn ohos_clang_target() -> String {
+    match env::var("CARGO_CFG_TARGET_ARCH").as_deref() {
+        Ok("aarch64") => "aarch64-linux-ohos".to_string(),
+        Ok("armv7") => "arm-linux-ohos".to_string(),
+        Ok("x86_64") => "x86_64-linux-ohos".to_string(),
+        other => panic!("Unsupported OHOS target architecture: {:?}", other),
+    }
+}
+
+/// Locate the OHOS NDK `native` directory.
+///
+/// Accepts several conventions used by the OHOS/DevEco toolchains:
+/// - `OHOS_NDK_HOME` / `OHOS_SDK_HOME` may point at the SDK root
+///   (`<sdk>/native/sysroot`) or directly at the native dir;
+/// - `ohos_sdk_native` is the DevEco convention for the native dir itself.
+fn ohos_ndk_native_dir() -> Option<PathBuf> {
+    for var in ["OHOS_NDK_HOME", "OHOS_SDK_HOME", "ohos_sdk_native"] {
+        if let Ok(dir) = env::var(var) {
+            let p = PathBuf::from(&dir);
+            if p.join("sysroot").exists() {
+                return Some(p);
+            }
+            if p.join("native").join("sysroot").exists() {
+                return Some(p.join("native"));
+            }
+        }
+    }
+    None
+}
+
+fn ohos_sysroot() -> String {
+    if let Ok(sysroot) = env::var("OHOS_SYSROOT") {
+        return sysroot;
+    }
+    let native = ohos_ndk_native_dir().unwrap_or_else(|| {
+        panic!(
+            "Missing OHOS SDK. Set the OHOS_SYSROOT env var, or set OHOS_NDK_HOME/OHOS_SDK_HOME/ohos_sdk_native to the OHOS SDK (a directory containing native/sysroot)."
+        )
+    });
+    let sysroot = native.join("sysroot");
+    if !sysroot.exists() {
+        panic!("OHOS sysroot does not exist: {}", sysroot.to_string_lossy());
+    }
+    sysroot.to_string_lossy().to_string()
+}
+
+/// Locate the OHOS NDK clang binary (`<native>/llvm/bin/clang`).
+fn ohos_clang_path() -> PathBuf {
+    let native = ohos_ndk_native_dir().unwrap_or_else(|| {
+        panic!(
+            "Missing OHOS SDK. Set OHOS_NDK_HOME/OHOS_SDK_HOME/ohos_sdk_native to the OHOS SDK (a directory containing native/sysroot), or set CC_{}/OHOS_CLANG to the OHOS clang.",
+            env::var("TARGET").unwrap_or_default()
+        )
+    });
+    let clang = native.join("llvm").join("bin").join("clang");
+    if !clang.exists() {
+        panic!(
+            "OHOS clang not found at {}; set CC_{}/OHOS_CLANG to the OHOS clang",
+            clang.to_string_lossy(),
+            env::var("TARGET").unwrap_or_default()
+        );
+    }
+    clang
+}
+
+/// Make the whole build use the OHOS NDK toolchain: exposes `CC_<target>` /
+/// `CXX_<target>` (used by the cc crate and by the OHOS configure branch
+/// below) and `CLANG_PATH` (used by bindgen to pick the same clang that can
+/// parse the OHOS sysroot). Explicit `OHOS_CLANG`/`OHOS_CXX` overrides win.
+fn setup_ohos_toolchain_env() {
+    let target = env::var("TARGET").unwrap();
+    let clang = env::var(format!("CC_{target}"))
+        .or_else(|_| env::var("OHOS_CLANG"))
+        .unwrap_or_else(|_| ohos_clang_path().to_string_lossy().to_string());
+    let clangxx = env::var(format!("CXX_{target}"))
+        .or_else(|_| env::var("OHOS_CXX"))
+        .unwrap_or_else(|_| {
+            // Prefer <clang dir>/clang++; if the configured clang carries a
+            // version suffix (e.g. clang-17), mirror it on clang++.
+            let dir = Path::new(&clang).parent().unwrap_or_else(|| Path::new(""));
+            let name = Path::new(&clang)
+                .file_name()
+                .and_then(|s| s.to_str())
+                .unwrap_or("clang");
+            let plain = dir.join("clang++");
+            if plain.exists() {
+                plain.to_string_lossy().to_string()
+            } else if let Some(suffix) = name.strip_prefix("clang") {
+                dir.join(format!("clang++{suffix}"))
+                    .to_string_lossy()
+                    .to_string()
+            } else {
+                plain.to_string_lossy().to_string()
+            }
+        });
+
+    unsafe {
+        env::set_var(format!("CC_{target}"), &clang);
+        env::set_var(format!("CXX_{target}"), &clangxx);
+        // bindgen must use a clang that can parse the OHOS sysroot; the host
+        // clang cannot. Respect an explicit user-provided CLANG_PATH.
+        if env::var("CLANG_PATH").is_err() {
+            env::set_var("CLANG_PATH", &clang);
+        }
+    }
+
+    // Rerun the build script when OHOS toolchain settings change.
+    for var in [
+        "OHOS_SYSROOT",
+        "OHOS_NDK_HOME",
+        "OHOS_SDK_HOME",
+        "ohos_sdk_native",
+        "OHOS_CLANG",
+        "OHOS_CXX",
+    ] {
+        println!("cargo:rerun-if-env-changed={var}");
+    }
+
+    // Rust-side linker setup for this package's linkable targets (bins, tests,
+    // cdylibs). rlibs are not linked here; downstream crates still need their
+    // own linker configuration in the app build system.
+    println!("cargo:rustc-linker={clang}");
+    for arg in [
+        format!("--target={}", ohos_clang_target()),
+        format!("--sysroot={}", ohos_sysroot()),
+        "-fuse-ld=lld".to_string(),
+    ] {
+        println!("cargo:rustc-link-arg={arg}");
+    }
+
+    println!("cargo:warning=Using OHOS clang: {clang}");
+}
+
 /// Find the sysroot required for a cross compilation by ffmpeg **and** bindgen
 /// @see https://github.com/rust-lang/rust-bindgen/issues/1229
 fn find_sysroot() -> Option<String> {
@@ -277,6 +419,14 @@ fn find_sysroot() -> Option<String> {
             panic!("Android sysroot path does not exists: {}", sysroot_path);
         }
 
+        return Some(sysroot_path);
+    }
+
+    if is_ohos() {
+        let sysroot_path = ohos_sysroot();
+        if !Path::new(&sysroot_path).exists() {
+            panic!("OHOS sysroot path does not exists: {}", sysroot_path);
+        }
         return Some(sysroot_path);
     }
 
@@ -512,6 +662,67 @@ fn build(sysroot: Option<&str>) -> io::Result<()> {
         configure.arg("--extra-cflags=-fPIC");
     }
 
+    if is_ohos() {
+        // Reference OHOS configure invocation (see the OHOS ecosystem):
+        //   ./configure --target-os=linux --arch=aarch64 --enable-cross-compile \
+        //     --cc="$OHOS_CLANG" --cxx="$OHOS_CLANG++" --sysroot="$OHOS_SYSROOT" \
+        //     --extra-cflags="--target=aarch64-linux-ohos -D__OHOS__ -fPIC" \
+        //     --extra-ldflags="--target=aarch64-linux-ohos -fuse-ld=lld"
+        // CC_<target>/CXX_<target> are populated by setup_ohos_toolchain_env.
+        let ohos_cc = env::var(format!("CC_{target}"))
+            .or_else(|_| env::var("OHOS_CLANG"))
+            .expect("Missing OHOS compiler. Set CC_<target> or OHOS_CLANG to the OHOS clang.");
+        let ohos_cxx = env::var(format!("CXX_{target}"))
+            .or_else(|_| env::var("OHOS_CXX"))
+            .expect("Missing OHOS C++ compiler. Set CXX_<target> or OHOS_CXX to the OHOS clang++.");
+        let ohos_cc_path = Path::new(&ohos_cc);
+        if !ohos_cc_path.exists() {
+            panic!("OHOS CC path does not exists: {}", ohos_cc);
+        }
+        configure.arg(format!("--cc={ohos_cc}"));
+        configure.arg(format!("--cxx={ohos_cxx}"));
+
+        let ohos_sysroot = match sysroot {
+            // find_sysroot() bails out early when HOST == TARGET (native OHOS
+            // builds), so fall back to the direct lookup here.
+            Some(s) => s.to_string(),
+            None => ohos_sysroot(),
+        };
+        configure.arg(format!("--sysroot={ohos_sysroot}"));
+
+        // Force the LLVM archive tools: the host `ar` (e.g. Apple's on macOS)
+        // produces BSD-format archives that rustc cannot read when linking
+        // the static libs.
+        for tool in ["nm", "strip", "ar", "ranlib"] {
+            configure.arg(format!(
+                "--{tool}={}",
+                ohos_cc_path
+                    .parent()
+                    .expect("OHOS CC has no parent directory")
+                    .join(format!("llvm-{tool}"))
+                    .canonicalize()
+                    .unwrap_or_else(|_| panic!("failed to resolve a path to ohos {}", tool))
+                    .display()
+            ));
+        }
+
+        let clang_target = ohos_clang_target();
+        // These come after the generic cross-compile flags above; FFmpeg's
+        // configure appends extra-cflags/extra-ldflags, so the later
+        // --target=... wins over the rust-triple one added earlier.
+        configure.arg(format!(
+            "--extra-cflags=--target={clang_target} -D__OHOS__ -fPIC"
+        ));
+        configure.arg(format!(
+            "--extra-ldflags=--target={clang_target} -fuse-ld=lld"
+        ));
+
+        if matches!(env::var("CARGO_CFG_TARGET_ARCH").as_deref(), Ok("x86_64")) {
+            // x86 asm contains position dependent code (relocations)
+            configure.arg("--disable-asm");
+        }
+    }
+
     // control debug build
     if env::var("DEBUG").is_ok() {
         configure.arg("--enable-debug");
@@ -726,6 +937,12 @@ fn build(sysroot: Option<&str>) -> io::Result<()> {
         configure.arg("--enable-decoder=vp8_mediacodec");
         configure.arg("--enable-decoder=vp9_mediacodec");
         configure.arg("--enable-decoder=av1_mediacodec");
+    }
+
+    // OpenHarmony codec (OHOS only). Upstream FFmpeg has supported
+    // --enable-ohcodec since it merged the OpenHarmony codec module.
+    if env::var("CARGO_FEATURE_BUILD_OHCODEC").is_ok() && is_ohos() {
+        configure.arg("--enable-ohcodec");
     }
 
     // AMD Advanced Media Framework (Linux and Windows)
@@ -1088,6 +1305,12 @@ fn main() {
     let statik = env::var("CARGO_FEATURE_STATIC").is_ok();
     let ffmpeg_major_version: u32 = env!("CARGO_PKG_VERSION_MAJOR").parse().unwrap();
     let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap();
+
+    // For OHOS cross compilation, point the cc crate and bindgen at the OHOS
+    // NDK toolchain before anything else runs.
+    if is_ohos() && env::var("CARGO_FEATURE_BUILD").is_ok() {
+        setup_ohos_toolchain_env();
+    }
 
     let sysroot = find_sysroot();
     let include_paths: Vec<PathBuf> = if env::var("CARGO_FEATURE_BUILD").is_ok() {
@@ -1731,6 +1954,13 @@ fn main() {
 
     if let Some(sysroot) = sysroot.as_deref() {
         builder = builder.clang_arg(format!("--sysroot={sysroot}"));
+    }
+
+    // OHOS: the sysroot headers and FFmpeg port require the __OHOS__ macro,
+    // and bindgen must target the OHOS clang triple (not the host's).
+    if is_ohos() {
+        builder = builder.clang_arg(format!("--target={}", ohos_clang_target()));
+        builder = builder.clang_arg("-D__OHOS__");
     }
 
     // The input headers we would like to generate
