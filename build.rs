@@ -225,6 +225,19 @@ fn get_ffmpeg_target_os() -> String {
     let cargo_target_os = env::var("CARGO_CFG_TARGET_OS").unwrap();
     match cargo_target_os.as_str() {
         "ios" | "tvos" => "darwin".to_string(),
+        // FFmpeg's configure has no "windows" OS; it expects mingw32/mingw64
+        // (GNU toolchain) or win32/win64 (MSVC). Map Rust's "windows" to the
+        // right name so `--target-os` is accepted when cross-compiling.
+        "windows" => {
+            let is_msvc = env::var("CARGO_CFG_TARGET_ENV").as_deref() == Ok("msvc");
+            let is_64 = env::var("CARGO_CFG_TARGET_POINTER_WIDTH").as_deref() == Ok("64");
+            match (is_msvc, is_64) {
+                (true, true) => "win64".to_string(),
+                (true, false) => "win32".to_string(),
+                (false, true) => "mingw64".to_string(),
+                (false, false) => "mingw32".to_string(),
+            }
+        }
         _ => cargo_target_os,
     }
 }
