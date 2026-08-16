@@ -540,10 +540,18 @@ fn build(sysroot: Option<&str>) -> io::Result<()> {
     // make it static
     configure.arg("--enable-static");
     configure.arg("--disable-shared");
-    // windows includes threading in the standard library
-    #[cfg(not(target_env = "msvc"))]
+    // Enable pthreads only where it applies. Gate on the TARGET (env vars), NOT
+    // a build-script #[cfg] — a build script's cfg is evaluated for the HOST, so
+    // #[cfg(not(target_env = "msvc"))] wrongly adds --enable-pthreads when
+    // cross-compiling from a non-MSVC host (e.g. Linux -> Windows). Windows uses
+    // native w32threads and has no pthread library, so skip it for any Windows
+    // target; MSVC likewise. FFmpeg then auto-selects w32threads.
     {
-        configure.arg("--enable-pthreads");
+        let target_env = env::var("CARGO_CFG_TARGET_ENV").unwrap_or_default();
+        let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
+        if target_env != "msvc" && target_os != "windows" {
+            configure.arg("--enable-pthreads");
+        }
     }
 
     // position independent code
