@@ -8,6 +8,7 @@
 #![allow(clippy::type_complexity)]
 #![allow(clippy::ptr_offset_with_cast)]
 #![allow(clippy::useless_transmute)]
+#![allow(clippy::manual_div_ceil)]
 #![allow(unpredictable_function_pointer_comparisons)]
 #![allow(unnecessary_transmutes)]
 
