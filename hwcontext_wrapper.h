@@ -61,7 +61,7 @@ typedef unsigned int D3D12_HEAP_FLAGS;
 #endif
 
 // ── VAAPI (shim: hwcontext_stubs/va/va.h) ─────────────────────────────────
-#if __has_include(<libavutil/hwcontext_vaapi.h>)
+#if !defined(_WIN32) && __has_include(<libavutil/hwcontext_vaapi.h>)
 #include <libavutil/hwcontext_vaapi.h>
 #endif
 
