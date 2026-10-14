@@ -13,6 +13,17 @@
 #define CUDA_VERSION 12000
 typedef struct CUctx_st *CUcontext;
 typedef struct CUstream_st *CUstream;
+typedef struct CUarray_st *CUarray;
+// AVCUDAFramesContext holds this by value, so it needs cuda.h's exact layout.
+typedef int CUarray_format;
+typedef struct CUDA_ARRAY3D_DESCRIPTOR_st {
+    size_t Width;
+    size_t Height;
+    size_t Depth;
+    CUarray_format Format;
+    unsigned int NumChannels;
+    unsigned int Flags;
+} CUDA_ARRAY3D_DESCRIPTOR;
 #include <libavutil/hwcontext_cuda.h>
 #endif
 
