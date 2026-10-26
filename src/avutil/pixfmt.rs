@@ -284,3 +284,8 @@ pub const AV_PIX_FMT_GBRP10MSB: AVPixelFormat = AV_PIX_FMT_GBRP10MSBBE;
 pub const AV_PIX_FMT_GBRP12MSB: AVPixelFormat = AV_PIX_FMT_GBRP12MSBLE;
 #[cfg(all(feature = "ffmpeg_8_0", target_endian = "big"))]
 pub const AV_PIX_FMT_GBRP12MSB: AVPixelFormat = AV_PIX_FMT_GBRP12MSBBE;
+
+#[cfg(all(feature = "ffmpeg_9_1", target_endian = "little"))]
+pub const AV_PIX_FMT_XYZP12: AVPixelFormat = AV_PIX_FMT_XYZP12LE;
+#[cfg(all(feature = "ffmpeg_9_1", target_endian = "big"))]
+pub const AV_PIX_FMT_XYZP12: AVPixelFormat = AV_PIX_FMT_XYZP12BE;

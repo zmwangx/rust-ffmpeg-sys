@@ -13,6 +13,19 @@
 #define CUDA_VERSION 12000
 typedef struct CUctx_st *CUcontext;
 typedef struct CUstream_st *CUstream;
+// Used by AVCUDAFramesContext / AVCUDAArrayFrameDescriptor (FFmpeg 9.1+).
+// AVCUDAFramesContext embeds the descriptor by value, so it mirrors cuda.h's
+// CUDA_ARRAY3D_DESCRIPTOR_v2 layout.
+typedef struct CUarray_st *CUarray;
+typedef int CUarray_format;
+typedef struct CUDA_ARRAY3D_DESCRIPTOR_st {
+    size_t Width;
+    size_t Height;
+    size_t Depth;
+    CUarray_format Format;
+    unsigned int NumChannels;
+    unsigned int Flags;
+} CUDA_ARRAY3D_DESCRIPTOR;
 #include <libavutil/hwcontext_cuda.h>
 #endif
 

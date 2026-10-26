@@ -1,6 +1,6 @@
 [package]
 name    = "ffmpeg-sys-next"
-version = "9.0.1"
+version = "9.1.0"
 build   = "build.rs"
 links   = "ffmpeg"
 edition = "2024"
@@ -21,7 +21,7 @@ libc = "0.2"
 
 [build-dependencies]
 num_cpus   = "1.17"
-cc         = "1.6"
+cc         = "1.10"
 pkg-config = "0.3"
 bindgen    = { version = "0.73", default-features = false, features = ["runtime"] }
 
