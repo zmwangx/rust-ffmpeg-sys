@@ -1193,11 +1193,15 @@ fn main() {
         if statik {
             if cfg!(feature = "avcodec") || cfg!(feature = "avdevice") {
                 println!("cargo:rustc-link-lib=ole32");
+                println!("cargo:rustc-link-lib=mfuuid");
+                println!("cargo:rustc-link-lib=strmiids");
             }
 
             if cfg!(feature = "avformat") {
                 println!("cargo:rustc-link-lib=secur32");
                 println!("cargo:rustc-link-lib=ws2_32");
+                println!("cargo:rustc-link-lib=ncrypt");
+                println!("cargo:rustc-link-lib=crypt32");
             }
 
             // avutil dependencies
