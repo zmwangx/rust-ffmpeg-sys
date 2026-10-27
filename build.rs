@@ -1293,13 +1293,12 @@ fn main() {
 
         // Frameworks only available on macOS
         if target_os == "macos" {
-            let macos_frameworks = vec![
-                "AppKit",
-                "OpenCL",
-                "OpenGL",
-                "QTKit",
-                "VideoDecodeAcceleration",
-            ];
+            let mut macos_frameworks =
+                vec!["AppKit", "OpenCL", "OpenGL", "VideoDecodeAcceleration"];
+            // The SDK has QTKit only for x86_64, FFmpeg before 3.4 can still use it there.
+            if env::var("CARGO_CFG_TARGET_ARCH").as_deref() == Ok("x86_64") {
+                macos_frameworks.push("QTKit");
+            }
             for f in &macos_frameworks {
                 println!("cargo:rustc-link-lib=framework={f}");
             }
