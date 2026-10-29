@@ -474,21 +474,47 @@ fn build(sysroot: Option<&str>) -> io::Result<()> {
     if env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("android") {
         // cargo ndk auto populates rust env variables for android cross compilation
         // so we can just leverage the same compiler path and cflags for ffmpeg build
-        let android_cc_raw_path = env::var(format!("CC_{target}")).expect("Missing CC path for android. Make sure to use cargo-ndk for adnrdoic cross compilation");
+        let android_cc_raw_path = env::var(format!("CC_{target}")).unwrap_or_else(|_| {
+            if env::var("HOST").as_deref() == Ok(env::var("TARGET").unwrap_or_default().as_str())
+            {
+                // native build (e.g. Termux): no cargo-ndk, so use the default compiler
+                // name, which `configure` resolves through PATH itself
+                "clang".to_string()
+            } else {
+                panic!("Missing CC path for android. Make sure to use cargo-ndk for android cross compilation")
+            }
+        });
+        // Only an explicit path has to exist; a bare compiler name is resolved by `configure`.
         let android_cc_path = Path::new(&android_cc_raw_path);
-        if !android_cc_path.exists() {
+        if android_cc_raw_path.contains('/') && !android_cc_path.exists() {
             panic!("Android CC path does not exists: {}", android_cc_raw_path);
         }
         configure.arg(format!("--cc={android_cc_raw_path}"));
 
+        let tool_dir = android_cc_path.parent().unwrap_or(Path::new("."));
         for tool in ["nm", "strip"] {
+            let name = format!("llvm-{tool}");
+            let resolved = tool_dir.join(&name).canonicalize().ok().or_else(|| {
+                // `CC/..` only resolves when CC is a directory (some NDK layouts).
+                // Otherwise look the tool up in the compiler's own directory, then PATH.
+                let cc_resolved = Command::new("sh")
+                    .arg("-c")
+                    .arg(format!("command -v {android_cc_raw_path}"))
+                    .output()
+                    .ok()
+                    .map(|out| String::from_utf8_lossy(&out.stdout).trim().to_owned())
+                    .filter(|p| !p.is_empty())
+                    .and_then(|cc| PathBuf::from(cc).parent().map(|d| d.join(&name)));
+
+                let candidates = cc_resolved
+                    .into_iter()
+                    .chain(std::iter::once(tool_dir.join(&name)));
+                candidates.into_iter().find(|candidate| candidate.exists())
+            });
             configure.arg(format!(
                 "--{tool}={}",
-                android_cc_path
-                    .join("..")
-                    .join(format!("llvm-{tool}"))
-                    .canonicalize()
-                    .unwrap_or_else(|_| panic!("failed to resolve a path to android {}", tool))
+                resolved
+                    .unwrap_or_else(|| panic!("failed to resolve a path to android {}", tool))
                     .display()
             ));
         }
