@@ -84,7 +84,7 @@ jobs:
     name: Manually fetch, build, and link static ffmpeg
     runs-on: ubuntu-latest
     env:
-      FEATURES: build,static,build-lib-x264,build-license-gpl,avcodec,avdevice,avfilter,avformat,swresample,swscale #,postproc
+      FEATURES: build,static,build-lib-x264,build-license-gpl,build-nvenc,avcodec,avdevice,avfilter,avformat,swresample,swscale #,postproc
     steps:
       - uses: actions/checkout@v2
       - name: Set up Rust
@@ -99,7 +99,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt update
-          sudo apt install -y --no-install-recommends clang curl pkg-config ca-certificates llvm pkg-config curl libssl-dev yasm nasm libx264-dev
+          sudo apt install -y --no-install-recommends clang curl pkg-config ca-certificates llvm pkg-config curl libssl-dev yasm nasm libx264-dev libffmpeg-nvenc-dev
 
       - name: Build and statically link latest ffmpeg
         run: |

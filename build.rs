@@ -687,6 +687,8 @@ fn build(sysroot: Option<&str>) -> io::Result<()> {
     if env::var("CARGO_FEATURE_BUILD_NVIDIA").is_ok()
         && matches!(target_os.as_str(), "linux" | "windows")
     {
+        // cuda, cuvid and nvenc need the nv-codec-headers, which --disable-autodetect leaves off
+        configure.arg("--enable-ffnvcodec");
         configure.arg("--enable-libnpp");
         configure.arg("--enable-cuda-nvcc");
         configure.arg("--enable-cuvid");
@@ -744,6 +746,8 @@ fn build(sysroot: Option<&str>) -> io::Result<()> {
     // other external libraries
     enable!(configure, "BUILD_LIB_DRM", "libdrm");
     enable!(configure, "BUILD_NVENC", "nvenc");
+    // nvenc needs the nv-codec-headers, which --disable-autodetect leaves off
+    enable!(configure, "BUILD_NVENC", "ffnvcodec");
 
     // configure external protocols
     enable!(configure, "BUILD_LIB_SMBCLIENT", "libsmbclient");
