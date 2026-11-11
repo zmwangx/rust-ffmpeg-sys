@@ -1170,6 +1170,13 @@ fn main() {
                 "cargo:rustc-link-search=native={}",
                 ffmpeg_dir.join("lib/amd64").to_string_lossy()
             );
+        } else if ffmpeg_dir.join("lib/x64").exists()
+            && env::var("CARGO_CFG_TARGET_ARCH").as_deref() == Ok("x86_64")
+        {
+            println!(
+                "cargo:rustc-link-search=native={}",
+                ffmpeg_dir.join("lib/x64").to_string_lossy()
+            );
         } else if ffmpeg_dir.join("lib/armhf").exists()
             && env::var("CARGO_CFG_TARGET_ARCH").as_deref() == Ok("arm")
         {
