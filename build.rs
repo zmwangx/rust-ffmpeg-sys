@@ -1733,6 +1733,11 @@ fn main() {
         .blocklist_function("y1l")
         .blocklist_function("ynl")
         .opaque_type("__mingw_ldbl_type_t")
+        // MinGW: hwcontext_wrapper.h -> d3d11.h -> windows.h -> x86intrin.h pulls in
+        // clang's AMX intrinsics. `__tile1024i_str` has a 64-byte-aligned member that
+        // bindgen emits as both packed and aligned (E0587). FFmpeg never uses AMX.
+        // https://github.com/zmwangx/rust-ffmpeg-sys/issues/138
+        .blocklist_type("_{1,2}tile1024i.*")
         .default_enum_style(bindgen::EnumVariation::Rust {
             non_exhaustive: env::var("CARGO_FEATURE_NON_EXHAUSTIVE_ENUMS").is_ok(),
         })
