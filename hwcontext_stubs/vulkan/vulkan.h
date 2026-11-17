@@ -54,14 +54,15 @@ typedef void (*PFN_vkVoidFunction)(void);
 typedef PFN_vkVoidFunction (*PFN_vkGetInstanceProcAddr)(VkInstance, const char *);
 
 // Embedded BY VALUE, so its size must be exact. Defined structurally (the frozen
-// Vulkan 1.1 layout) so clang derives size = 240; _Static_assert pins it. The
-// "55" is VkPhysicalDeviceFeatures's member count (frozen; grows via pNext).
+// Vulkan 1.1 layout) so clang derives the size: 240 bytes where pointers are 8
+// bytes wide, 228 where they are 4. _Static_assert pins it. The "55" is
+// VkPhysicalDeviceFeatures's member count (frozen; grows via pNext).
 typedef struct VkPhysicalDeviceFeatures2 {
     VkStructureType sType;
     void           *pNext;
     VkBool32        features[55];
 } VkPhysicalDeviceFeatures2;
-_Static_assert(sizeof(VkPhysicalDeviceFeatures2) == 240,
-               "VkPhysicalDeviceFeatures2 must be 240 bytes (Vulkan 1.1 frozen ABI)");
+_Static_assert(sizeof(VkPhysicalDeviceFeatures2) == (sizeof(void *) == 8 ? 240 : 228),
+               "VkPhysicalDeviceFeatures2 must be 240 bytes on a 64-bit ABI, 228 on a 32-bit one");
 
 #endif
